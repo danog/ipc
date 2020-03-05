@@ -14,7 +14,6 @@ Loop::run(static function () {
 
         while ($payload = yield $socket->receive()) {
             echo "Received $payload".PHP_EOL;
-            yield $socket->disconnect();
         }
         echo "Closed connection".PHP_EOL;
     };

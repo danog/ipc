@@ -1,6 +1,7 @@
 # template
 
 [![Build Status](https://img.shields.io/travis/danog/ipc/master.svg?style=flat-square)](https://travis-ci.org/danog/ipc)
+[![Build status](https://ci.appveyor.com/api/projects/status/1tcxa257p5dj52ck?svg=true)](https://ci.appveyor.com/project/danog/ipc)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
 
 `amphp/ipc` provides an async IPC server.
@@ -21,8 +22,8 @@ Server:
 require 'vendor/autoload.php';
 
 use Amp\Ipc\IpcServer;
-use Amp\Loop;
 use Amp\Ipc\Sync\ChannelledSocket;
+use Amp\Loop;
 
 use function Amp\asyncCall;
 
@@ -34,17 +35,18 @@ Loop::run(static function () {
             echo "Received $payload".PHP_EOL;
             if ($payload === 'ping') {
                 yield $socket->send('pong');
+                yield $socket->disconnect();
             }
         }
-        yield $socket->disconnect();
-        echo "Closed connection".PHP_EOL;
+        echo "Closed connection".PHP_EOL."==========".PHP_EOL;
     };
 
-    $server = new IpcServer(sys_get_temp_dir().'/test');
+    $server = new IpcServer(\sys_get_temp_dir().'/test');
     while ($socket = yield $server->accept()) {
         asyncCall($clientHandler, $socket);
     }
 });
+
 ```
 
 Client:
@@ -54,8 +56,8 @@ Client:
 
 require 'vendor/autoload.php';
 
-use Amp\Loop;
 use Amp\Ipc\Sync\ChannelledSocket;
+use Amp\Loop;
 
 use function Amp\asyncCall;
 use function Amp\Ipc\connect;
@@ -66,12 +68,11 @@ Loop::run(static function () {
 
         while ($payload = yield $socket->receive()) {
             echo "Received $payload".PHP_EOL;
-            yield $socket->disconnect();
         }
         echo "Closed connection".PHP_EOL;
     };
 
-    $channel = yield connect(sys_get_temp_dir().'/test');
+    $channel = yield connect(\sys_get_temp_dir().'/test');
     asyncCall($clientHandler, $channel);
     yield $channel->send('ping');
 });

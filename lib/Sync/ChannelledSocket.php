@@ -58,6 +58,7 @@ final class ChannelledSocket implements Channel
             if ($data instanceof ChannelCloseReq) {
                 yield $this->channel->send(new ChannelCloseAck);
                 $this->state = self::GOT_FIN_MASK;
+                yield $this->disconnect();
                 return null;
             }
 
@@ -73,7 +74,7 @@ final class ChannelledSocket implements Channel
     public function disconnect(): Promise
     {
         if (!$this->channel) {
-            throw new ChannelException('The channel was already closed!');
+            return new Success();
         }
         $channel = $this->channel;
         $this->channel = null;

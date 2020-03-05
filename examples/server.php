@@ -16,9 +16,9 @@ Loop::run(static function () {
             echo "Received $payload".PHP_EOL;
             if ($payload === 'ping') {
                 yield $socket->send('pong');
+                yield $socket->disconnect();
             }
         }
-        yield $socket->disconnect();
         echo "Closed connection".PHP_EOL."==========".PHP_EOL;
     };
 
