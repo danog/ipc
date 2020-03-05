@@ -22,7 +22,7 @@ return function (Channel $channel) use ($argv) {
     }
 
     $ping = yield $socket->receive();
-    
+
     if ($ping !== 'ping') {
         throw new \RuntimeException("Received $ping instead of ping!");
     }

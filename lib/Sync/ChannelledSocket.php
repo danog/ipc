@@ -86,7 +86,7 @@ final class ChannelledSocket implements Channel
                 if ($data instanceof ChannelCloseReq) {
                     yield $channel->send(new ChannelCloseAck);
                     $this->state |= self::GOT_FIN_MASK;
-                } else if ($data instanceof ChannelCloseAck) {
+                } elseif ($data instanceof ChannelCloseAck) {
                     $this->state |= self::GOT_ACK_MASK;
                 }
             } while ($this->state !== self::GOT_ALL_MASK);

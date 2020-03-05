@@ -17,10 +17,10 @@ use function Amp\call;
 function connect(string $uri): Promise
 {
     return call(static function () use ($uri) {
-        if (!file_exists($uri)) {
+        if (!\file_exists($uri)) {
             throw new \RuntimeException("The endpoint does not exist!");
         }
-        
+
         $type = \filetype($uri);
         if ($type !== 'fifo') {
             if ($type === 'file') {

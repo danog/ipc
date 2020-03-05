@@ -3,8 +3,8 @@
 namespace Amp\Ipc;
 
 use Amp\Deferred;
-use Amp\Loop;
 use Amp\Ipc\Sync\ChannelledSocket;
+use Amp\Loop;
 use Amp\Promise;
 use Amp\Success;
 

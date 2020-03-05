@@ -34,7 +34,7 @@ class IpcTest extends AsyncTestCase
 
     public function provideUriFifo(): \Generator
     {
-        foreach (['', sys_get_temp_dir().'/pony'] as $uri) {
+        foreach (['', \sys_get_temp_dir().'/pony'] as $uri) {
             if (\strncasecmp(\PHP_OS, "WIN", 3) === 0) {
                 yield [$uri, false];
             } else {
