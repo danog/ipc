@@ -1,5 +1,5 @@
 {
-    "name": "amphp/ipc",
+    "name": "danog/ipc",
     "description": "IPC component for Amp.",
     "keywords": [
         "asynchronous",
@@ -8,16 +8,16 @@
         "multi-threading",
         "multi-processing"
     ],
-    "homepage": "https://github.com/amphp/ipc",
+    "homepage": "https://github.com/danog/ipc",
     "license": "MIT",
     "authors": [
         {
-            "name": "Aaron Piotrowski",
-            "email": "aaron@trowski.com"
-        },
-        {
             "name": "Daniil Gentili",
             "email": "daniil@daniil.it"
+        },
+        {
+            "name": "Aaron Piotrowski",
+            "email": "aaron@trowski.com"
         },
         {
             "name": "Stephen Coakley",

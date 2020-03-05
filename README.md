@@ -1,15 +1,15 @@
-# template
+# IPC
 
 [![Build Status](https://img.shields.io/travis/danog/ipc/master.svg?style=flat-square)](https://travis-ci.org/danog/ipc)
 [![Build status](https://ci.appveyor.com/api/projects/status/1tcxa257p5dj52ck?svg=true)](https://ci.appveyor.com/project/danog/ipc)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
 
-`amphp/ipc` provides an async IPC server.
+`danog/ipc` provides an async IPC server.
 
 ## Installation
 
 ```bash
-composer require amphp/ipc
+composer require danog/ipc
 ```
 
 ## Example
