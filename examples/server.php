@@ -18,7 +18,8 @@ Loop::run(static function () {
                 yield $socket->send('pong');
             }
         }
-        echo "Closed connection".PHP_EOL;
+        yield $socket->disconnect();
+        echo "Closed connection".PHP_EOL."==========".PHP_EOL;
     };
 
     $server = new IpcServer(sys_get_temp_dir().'/test');

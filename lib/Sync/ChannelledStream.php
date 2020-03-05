@@ -69,7 +69,7 @@ final class ChannelledStream implements Channel
                 }
 
                 if ($chunk === null) {
-                    return null;
+                    throw new ChannelException("The channel closed unexpectedly. Did the context die?");
                 }
 
                 $this->parser->push($chunk);

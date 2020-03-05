@@ -17,62 +17,65 @@ use function Amp\call;
 function connect(string $uri): Promise
 {
     return call(static function () use ($uri) {
+        if (!file_exists($uri)) {
+            throw new \RuntimeException("The endpoint does not exist!");
+        }
+        
         $type = \filetype($uri);
-        if ($type === 'fifo') {
-            $suffix = \bin2hex(\random_bytes(10));
-            $prefix = \sys_get_temp_dir()."/amp-".$suffix.".fifo";
-
-            if (\strlen($prefix) > 0xFFFF) {
-                \trigger_error("Prefix is too long!", E_USER_ERROR);
-                exit(1);
+        if ($type !== 'fifo') {
+            if ($type === 'file') {
+                $uri = \file_get_contents($uri);
+            } else {
+                $uri = "unix://$uri";
             }
+            if (!$socket = \stream_socket_client($uri, $errno, $errstr, 5, \STREAM_CLIENT_CONNECT)) {
+                $message = "Could not connect to IPC socket";
+                if ($error = \error_get_last()) {
+                    $message .= \sprintf(" Errno: %d; %s", $error["type"], $error["message"]);
+                }
+                throw new \RuntimeException($message);
+            }
+            return new ChannelledSocket($socket, $socket);
+        }
 
-            $sockets = [
+        $suffix = \bin2hex(\random_bytes(10));
+        $prefix = \sys_get_temp_dir()."/amp-".$suffix.".fifo";
+
+        if (\strlen($prefix) > 0xFFFF) {
+            throw new \RuntimeException('Prefix is too long!');
+        }
+
+        $sockets = [
                 $prefix."2",
                 $prefix."1",
             ];
 
-            foreach ($sockets as $k => &$socket) {
-                if (!\posix_mkfifo($socket, 0777)) {
-                    \trigger_error("Could not create FIFO client socket", E_USER_ERROR);
-                    exit(1);
-                }
-
-                \register_shutdown_function(static function () use ($socket): void {
-                    @\unlink($socket);
-                });
-
-                if (!$socket = \fopen($socket, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
-                    \trigger_error("Could not open FIFO client socket", E_USER_ERROR);
-                    exit(1);
-                }
+        foreach ($sockets as $k => &$socket) {
+            if (!\posix_mkfifo($socket, 0777)) {
+                throw new \RuntimeException('Could not create FIFO client socket!');
             }
 
-            if (!$tempSocket = \fopen($uri, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
-                \trigger_error("Could not connect to FIFO server", E_USER_ERROR);
-                exit(1);
-            }
-            \stream_set_blocking($tempSocket, false);
-            \stream_set_write_buffer($tempSocket, 0);
+            \register_shutdown_function(static function () use ($socket): void {
+                @\unlink($socket);
+            });
 
-            if (!\fwrite($tempSocket, \pack('v', \strlen($prefix)).$prefix)) {
-                \trigger_error("Failure sending request to FIFO server", E_USER_ERROR);
-                exit(1);
+            if (!$socket = \fopen($socket, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
+                throw new \RuntimeException("Could not open FIFO client socket");
             }
-            \fclose($tempSocket);
-            $tempSocket = null;
+        }
 
-            return new ChannelledSocket(...$sockets);
+        if (!$tempSocket = \fopen($uri, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
+            throw new \RuntimeException("Could not connect to FIFO server");
         }
-        if ($type === 'file') {
-            $uri = \file_get_contents($uri);
-        } else {
-            $uri = "unix://$uri";
+        \stream_set_blocking($tempSocket, false);
+        \stream_set_write_buffer($tempSocket, 0);
+
+        if (!\fwrite($tempSocket, \pack('v', \strlen($prefix)).$prefix)) {
+            throw new \RuntimeException("Failure sending request to FIFO server");
         }
-        if (!$socket = \stream_socket_client($uri, $errno, $errstr, 5, \STREAM_CLIENT_CONNECT)) {
-            \trigger_error("Could not connect to IPC socket", E_USER_ERROR);
-            exit(1);
-        }
-        return new ChannelledSocket($socket, $socket);
+        \fclose($tempSocket);
+        $tempSocket = null;
+
+        return new ChannelledSocket(...$sockets);
     });
 }
