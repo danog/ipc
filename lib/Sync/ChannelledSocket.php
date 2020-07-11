@@ -4,6 +4,7 @@ namespace Amp\Ipc\Sync;
 
 use Amp\ByteStream\ResourceInputStream;
 use Amp\ByteStream\ResourceOutputStream;
+use Amp\Deferred;
 use Amp\Promise;
 use Amp\Success;
 
@@ -30,6 +31,12 @@ final class ChannelledSocket implements Channel
     /** @var int */
     private $state = self::ESTABLISHED;
 
+    /** @var Deferred */
+    private $closePromise;
+
+    /** @var bool */
+    private $reading = false;
+
     /**
      * @param resource $read Readable stream resource.
      * @param resource $write Writable stream resource.
@@ -53,12 +60,17 @@ final class ChannelledSocket implements Channel
             return new Success();
         }
         return call(function (): \Generator {
+            $this->reading = true;
             $data = yield $this->channel->receive();
+            $this->reading = false;
 
             if ($data instanceof ChannelCloseReq) {
                 yield $this->channel->send(new ChannelCloseAck);
                 $this->state = self::GOT_FIN_MASK;
                 yield $this->disconnect();
+                return null;
+            } elseif ($data instanceof ChannelCloseAck) {
+                $this->closePromise->resolve($data);
                 return null;
             }
 
@@ -81,9 +93,14 @@ final class ChannelledSocket implements Channel
         return call(function () use ($channel): \Generator {
             yield $channel->send(new ChannelCloseReq);
 
+            if ($this->reading) {
+                $this->closePromise = new Deferred;
+            }
             do {
-                $data = yield $channel->receive();
-
+                $data = yield ($this->closePromise ? $this->closePromise->promise() : $channel->receive());
+                if ($this->closePromise) {
+                    $this->closePromise = null;
+                }
                 if ($data instanceof ChannelCloseReq) {
                     yield $channel->send(new ChannelCloseAck);
                     $this->state |= self::GOT_FIN_MASK;
