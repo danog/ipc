@@ -8,6 +8,17 @@ use Amp\Promise;
 use function Amp\call;
 
 /**
+ * Create IPC server.
+ *
+ * @param string $uri Local endpoint on which to listen for requests
+ *
+ * @return IpcServer
+ */
+function listen(string $uri): IpcServer
+{
+    return new IpcServer($uri);
+}
+/**
  * Connect to IPC server.
  *
  * @param string $uri URI

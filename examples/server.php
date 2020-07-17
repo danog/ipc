@@ -2,11 +2,11 @@
 
 require 'vendor/autoload.php';
 
-use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\Loop;
 
 use function Amp\asyncCall;
+use function Amp\Ipc\listen;
 
 Loop::run(static function () {
     $clientHandler = function (ChannelledSocket $socket) {
@@ -22,7 +22,7 @@ Loop::run(static function () {
         echo "Closed connection".PHP_EOL."==========".PHP_EOL;
     };
 
-    $server = new IpcServer(\sys_get_temp_dir().'/test');
+    $server = listen(\sys_get_temp_dir().'/test');
     while ($socket = yield $server->accept()) {
         asyncCall($clientHandler, $socket);
     }
