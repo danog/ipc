@@ -3,13 +3,20 @@
 namespace Amp\Ipc;
 
 use Amp\Deferred;
+use Amp\Ipc\Signaling\Init;
+use Amp\Ipc\Signaling\InitAck;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\Loop;
 use Amp\Promise;
 use Amp\Success;
 
+use function Amp\asyncCall;
+
 class IpcServer
 {
+    /** @var int Server version */
+    const VERSION = 1;
+
     /** @var resource|null */
     private $server;
 
@@ -26,7 +33,7 @@ class IpcServer
      * @param string  $uri     Local endpoint on which to listen for requests
      * @param boolean $useFIFO Whether to use FIFOs instead of the more reliable UNIX socket server (CHOSEN AUTOMATICALLY, only for testing purposes)
      */
-    public function __construct(string $uri = '', bool $useFIFO = false)
+    public function __construct(string $uri = '', string $pwd = '', bool $useFIFO = false)
     {
         if (!$uri) {
             $suffix = \bin2hex(\random_bytes(10));
@@ -75,7 +82,7 @@ class IpcServer
         }
 
         $acceptor = &$this->acceptor;
-        $this->watcher = Loop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $fifo): void {
+        $this->watcher = Loop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $fifo, $pwd): void {
             if ($fifo) {
                 $length = \unpack('v', \fread($server, 2))[1];
                 if (!$length) {
@@ -104,13 +111,13 @@ class IpcServer
                         return; // Could not open fifo
                     }
                 }
-                $channel = new ChannelledSocket(...$sockets);
+                $channel = new ChannelledSocket($pwd, ...$sockets);
             } else {
                 // Error reporting suppressed since stream_socket_accept() emits E_WARNING on client accept failure.
                 if (!$client = @\stream_socket_accept($server, 0)) {  // Timeout of 0 to be non-blocking.
                     return; // Accepting client failed.
                 }
-                $channel = new ChannelledSocket($client, $client);
+                $channel = new ChannelledSocket($pwd, $client, $client);
             }
 
             $deferred = $acceptor;
@@ -118,7 +125,30 @@ class IpcServer
 
             \assert($deferred !== null);
 
-            $deferred->resolve($channel);
+            $channel->receive()->onResolve(static function ($result, $error) use ($channel, $deferred, $pwd): \Generator {
+                if ($error) {
+                    throw $error;
+                }
+                if ($result instanceof Init) {
+                    if ($result->getPassword() !== $pwd) {
+                        yield $channel->send(InitAck::wrongPassword());
+                        yield $channel->disconnect();
+                    } else if ($result->getVersion() !== self::VERSION) {
+                        yield $channel->send(InitAck::wrongPassword());
+                        yield $channel->disconnect();
+                    } else {
+                        yield $channel->send(InitAck::ok());
+                        $deferred->resolve($channel);
+                    }
+                } else {
+                    if ($pwd === '') {
+                        $deferred->resolve($channel);
+                    } else {
+                        yield $channel->disconnect();
+                    }
+                }
+                $channel = null;
+            });
 
             if (!$acceptor) {
                 Loop::disable($watcher);
@@ -129,7 +159,7 @@ class IpcServer
     }
 
     /**
-     * Destructor function
+     * Destructor function.
      */
     public function __destruct()
     {

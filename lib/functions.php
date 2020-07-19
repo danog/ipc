@@ -2,6 +2,8 @@
 
 namespace Amp\Ipc;
 
+use Amp\Ipc\Signaling\Init;
+use Amp\Ipc\Signaling\InitAck;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\Promise;
 
@@ -11,23 +13,40 @@ use function Amp\call;
  * Create IPC server.
  *
  * @param string $uri Local endpoint on which to listen for requests
+ * @param string $pwd Optional authentication password
  *
  * @return IpcServer
  */
-function listen(string $uri): IpcServer
+function listen(string $uri, string $pwd = ''): IpcServer
 {
-    return new IpcServer($uri);
+    return new IpcServer($uri, $pwd);
 }
 /**
  * Connect to IPC server.
  *
  * @param string $uri URI
+ * @param string $pwd Optional authentication password
  *
  * @return Promise<ChannelledSocket>
  */
-function connect(string $uri): Promise
+function connect(string $uri, string $pwd = ''): Promise
 {
-    return call(static function () use ($uri) {
+    return connectInternal($uri, $pwd, Init::MAIN);
+}
+/**
+ * Connect to IPC server (internal function, don't use).
+ *
+ * @param string $uri  URI
+ * @param string $pwd  Optional authentication password
+ * @param int    $type Socket type
+ *
+ * @internal Internal method
+ *
+ * @return Promise<ChannelledSocket>
+ */
+function connectInternal(string $uri, string $pwd, int $type): Promise
+{
+    return call(static function () use ($uri, $pwd, $type) {
         if (!\file_exists($uri)) {
             throw new \RuntimeException("The endpoint does not exist!");
         }
@@ -87,6 +106,22 @@ function connect(string $uri): Promise
         \fclose($tempSocket);
         $tempSocket = null;
 
-        return new ChannelledSocket(...$sockets);
+        $channel = new ChannelledSocket(...$sockets);
+        yield $channel->send(new Init($pwd, $type, IpcServer::VERSION));
+        $ack = yield $channel->receive();
+        if (!$ack instanceof InitAck) {
+            throw new \RuntimeException("Received invalid init ACK!");
+        }
+        if ($ack->getStatus() === InitAck::STATUS_OK) {
+            return $channel;
+        }
+        yield $channel->disconnect();
+        $status = $ack->getStatus();
+        if ($status === InitAck::STATUS_WRONG_PASSWORD) {
+            throw new \RuntimeException("Wrong IPC server password!");
+        } elseif ($status === InitAck::STATUS_WRONG_VERSION) {
+            throw new \RuntimeException("Wrong IPC server version, please upgrade client or server!");
+        }
+        throw new \RuntimeException("Invalid IPC InitAck status: $status");
     });
 }

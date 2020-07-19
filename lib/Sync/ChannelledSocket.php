@@ -5,8 +5,10 @@ namespace Amp\Ipc\Sync;
 use Amp\ByteStream\ResourceInputStream;
 use Amp\ByteStream\ResourceOutputStream;
 use Amp\Deferred;
-use Amp\Ipc\Sync\Signaling\CloseAck;
-use Amp\Ipc\Sync\Signaling\CloseReq;
+use Amp\Ipc\Signaling\CloseAck;
+use Amp\Ipc\Signaling\CloseReq;
+use Amp\Ipc\Signaling\Inband;
+use Amp\Ipc\Signaling\StreamMsg;
 use Amp\Promise;
 use Amp\Success;
 
@@ -39,14 +41,19 @@ final class ChannelledSocket implements Channel
     /** @var bool */
     private $reading = false;
 
+    /** @var string Server password */
+    private $password = '';
+
     /**
+     * @param string   $pwd  Server password.
      * @param resource $read Readable stream resource.
      * @param resource $write Writable stream resource.
      *
      * @throws \Error If a stream resource is not given for $resource.
      */
-    public function __construct($read, $write)
+    public function __construct($pwd, $read, $write)
     {
+        $this->password = $pwd;
         $this->channel = new ChannelledStream(
             $this->read = new ResourceInputStream($read),
             $this->write = new ResourceOutputStream($write)
@@ -66,19 +73,19 @@ final class ChannelledSocket implements Channel
             $data = yield $this->channel->receive();
             $this->reading = false;
 
+            if (!$data instanceof Inband) {
+                return $data;
+            }
+
             if ($data instanceof CloseReq) {
                 yield $this->channel->send(new CloseAck);
                 $this->state = self::GOT_FIN_MASK;
                 yield $this->disconnect();
-                return null;
             } elseif ($data instanceof CloseAck) {
                 $closePromise = $this->closePromise;
                 $this->closePromise = null;
                 $closePromise->resolve($data);
-                return null;
             }
-
-            return $data;
         });
     }
 
@@ -126,6 +133,17 @@ final class ChannelledSocket implements Channel
         return $this->channel->send($data);
     }
 
+    /**
+     * Wrap stream for usage over IPC channel
+     *
+     * @param InputStream|OutputStream|mixed $stream Stream
+     * 
+     * @return inpu
+     */
+    public function wrap($stream): Promise
+    {
+
+    }
     /**
      * {@inheritdoc}
      */
