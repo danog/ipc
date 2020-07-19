@@ -128,6 +128,9 @@ class IpcServer
         Loop::disable($this->watcher);
     }
 
+    /**
+     * Destructor function
+     */
     public function __destruct()
     {
         $this->close();

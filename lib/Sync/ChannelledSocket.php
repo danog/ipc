@@ -5,6 +5,8 @@ namespace Amp\Ipc\Sync;
 use Amp\ByteStream\ResourceInputStream;
 use Amp\ByteStream\ResourceOutputStream;
 use Amp\Deferred;
+use Amp\Ipc\Sync\Signaling\CloseAck;
+use Amp\Ipc\Sync\Signaling\CloseReq;
 use Amp\Promise;
 use Amp\Success;
 
@@ -64,13 +66,15 @@ final class ChannelledSocket implements Channel
             $data = yield $this->channel->receive();
             $this->reading = false;
 
-            if ($data instanceof ChannelCloseReq) {
-                yield $this->channel->send(new ChannelCloseAck);
+            if ($data instanceof CloseReq) {
+                yield $this->channel->send(new CloseAck);
                 $this->state = self::GOT_FIN_MASK;
                 yield $this->disconnect();
                 return null;
-            } elseif ($data instanceof ChannelCloseAck) {
-                $this->closePromise->resolve($data);
+            } elseif ($data instanceof CloseAck) {
+                $closePromise = $this->closePromise;
+                $this->closePromise = null;
+                $closePromise->resolve($data);
                 return null;
             }
 
@@ -91,20 +95,17 @@ final class ChannelledSocket implements Channel
         $channel = $this->channel;
         $this->channel = null;
         return call(function () use ($channel): \Generator {
-            yield $channel->send(new ChannelCloseReq);
+            yield $channel->send(new CloseReq);
 
             if ($this->reading) {
                 $this->closePromise = new Deferred;
             }
             do {
                 $data = yield ($this->closePromise ? $this->closePromise->promise() : $channel->receive());
-                if ($this->closePromise) {
-                    $this->closePromise = null;
-                }
-                if ($data instanceof ChannelCloseReq) {
-                    yield $channel->send(new ChannelCloseAck);
+                if ($data instanceof CloseReq) {
+                    yield $channel->send(new CloseAck);
                     $this->state |= self::GOT_FIN_MASK;
-                } elseif ($data instanceof ChannelCloseAck) {
+                } elseif ($data instanceof CloseAck) {
                     $this->state |= self::GOT_ACK_MASK;
                 }
             } while ($this->state !== self::GOT_ALL_MASK);
