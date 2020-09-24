@@ -18,6 +18,7 @@ function listen(string $uri): IpcServer
 {
     return new IpcServer($uri);
 }
+
 /**
  * Connect to IPC server.
  *

@@ -28,6 +28,9 @@ final class ChannelledSocket implements Channel
     /** @var ResourceOutputStream */
     private $write;
 
+    /** @var bool */
+    private $closed = false;
+
     /** @var int */
     private $state = self::ESTABLISHED;
 
@@ -56,7 +59,7 @@ final class ChannelledSocket implements Channel
      */
     public function receive(): Promise
     {
-        if (!$this->channel) {
+        if ($this->closed) {
             return new Success();
         }
         return call(function (): \Generator {
@@ -85,24 +88,22 @@ final class ChannelledSocket implements Channel
      */
     public function disconnect(): Promise
     {
-        if (!$this->channel) {
+        if ($this->closed) {
             return new Success();
         }
-        $channel = $this->channel;
-        $this->channel = null;
-        return call(function () use ($channel): \Generator {
-            yield $channel->send(new ChannelCloseReq);
-
+        $this->closed = true;
+        return call(function (): \Generator {
+            yield $this->channel->send(new ChannelCloseReq);
             if ($this->reading) {
                 $this->closePromise = new Deferred;
             }
             do {
-                $data = yield ($this->closePromise ? $this->closePromise->promise() : $channel->receive());
+                $data = yield ($this->closePromise ? $this->closePromise->promise() : $this->channel->receive());
                 if ($this->closePromise) {
                     $this->closePromise = null;
                 }
                 if ($data instanceof ChannelCloseReq) {
-                    yield $channel->send(new ChannelCloseAck);
+                    yield $this->channel->send(new ChannelCloseAck);
                     $this->state |= self::GOT_FIN_MASK;
                 } elseif ($data instanceof ChannelCloseAck) {
                     $this->state |= self::GOT_ACK_MASK;
@@ -119,7 +120,7 @@ final class ChannelledSocket implements Channel
      */
     public function send($data): Promise
     {
-        if (!$this->channel) {
+        if ($this->closed) {
             throw new ChannelException('The channel was already closed!');
         }
         return $this->channel->send($data);
