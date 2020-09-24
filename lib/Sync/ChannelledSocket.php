@@ -71,6 +71,9 @@ final class ChannelledSocket implements Channel
                 yield $this->channel->send(new ChannelCloseAck);
                 $this->state = self::GOT_FIN_MASK;
                 yield $this->disconnect();
+                if ($this->closePromise) {
+                    $this->closePromise->resolve($data);
+                }
                 return null;
             } elseif ($data instanceof ChannelCloseAck) {
                 $this->closePromise->resolve($data);
