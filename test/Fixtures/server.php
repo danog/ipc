@@ -18,7 +18,7 @@ return function (Channel $channel) use ($argv) {
     $socket = yield $server->accept();
 
     if (!$socket instanceof ChannelledSocket) {
-        throw new \RuntimeException('Socket is not instance of ChanneledSocket');
+        throw new \RuntimeException('Socket is not instance of ChannelledSocket');
     }
 
     $ping = yield $socket->receive();

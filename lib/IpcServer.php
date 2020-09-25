@@ -134,7 +134,7 @@ class IpcServer
     }
 
     /**
-     * @return Promise<ChanneledSocket|null>
+     * @return Promise<ChannelledSocket|null>
      *
      * @throws PendingAcceptError If another accept request is pending.
      */
