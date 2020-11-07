@@ -24,9 +24,11 @@
             "email": "me@stephencoakley.com"
         }
     ],
+    "minimum-stability":"dev",
+    "prefer-stable": true,
     "require": {
         "php": ">=7.1",
-        "amphp/byte-stream": "^1",
+        "amphp/byte-stream": "^v2.x-dev",
         "amphp/parser": "^1"
     },
     "require-dev": {
