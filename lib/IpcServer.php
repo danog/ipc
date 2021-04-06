@@ -162,8 +162,9 @@ class IpcServer
         Loop::cancel($this->watcher);
 
         if ($this->acceptor) {
-            $this->acceptor->resolve();
+            $acceptor = $this->acceptor;
             $this->acceptor = null;
+            $acceptor->resolve();
         }
 
         if ($this->server) {
