@@ -94,12 +94,11 @@ final class ChannelledSocket implements Channel
         if ($this->closed) {
             return new Success();
         }
-        $this->closed = true;
         return call(function (): \Generator {
-            yield $this->channel->send(new ChannelCloseReq);
             if ($this->reading) {
                 $this->closePromise = new Deferred;
             }
+            yield $this->channel->send(new ChannelCloseReq);
             do {
                 $data = yield ($this->closePromise ? $this->closePromise->promise() : $this->channel->receive());
                 if ($this->closePromise) {
@@ -113,6 +112,7 @@ final class ChannelledSocket implements Channel
                 }
             } while ($this->state !== self::GOT_ALL_MASK);
 
+            $this->closed = true;
 
             $this->close();
         });
