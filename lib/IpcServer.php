@@ -52,7 +52,8 @@ class IpcServer
         if (!$useFIFO) {
             try {
                 $this->server = \stream_socket_server($listenUri, $errno, $errstr, \STREAM_SERVER_BIND | \STREAM_SERVER_LISTEN);
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+            }
         }
 
         $fifo = false;
