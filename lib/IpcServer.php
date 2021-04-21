@@ -10,6 +10,10 @@ use Amp\Success;
 
 class IpcServer
 {
+    public const TYPE_AUTO = 0;
+    public const TYPE_UNIX = 1 << 0;
+    public const TYPE_FIFO = 1 << 1;
+    public const TYPE_TCP = 1 << 2;
     /** @var resource|null */
     private $server;
 
@@ -23,10 +27,10 @@ class IpcServer
     private $uri;
 
     /**
-     * @param string  $uri     Local endpoint on which to listen for requests
-     * @param boolean $useFIFO Whether to use FIFOs instead of the more reliable UNIX socket server (CHOSEN AUTOMATICALLY, only for testing purposes)
+     * @param string       $uri  Local endpoint on which to listen for requests
+     * @param self::TYPE_* $type Server type
      */
-    public function __construct(string $uri = '', bool $useFIFO = false)
+    public function __construct(string $uri = '', int $type = self::TYPE_AUTO)
     {
         if (!$uri) {
             $suffix = \bin2hex(\random_bytes(10));
@@ -39,47 +43,86 @@ class IpcServer
 
 
         $isWindows = \strncasecmp(\PHP_OS, "WIN", 3) === 0;
-
         if ($isWindows) {
-            if ($useFIFO) {
-                throw new \RuntimeException("Cannot use FIFOs on windows");
+            if ($type === self::TYPE_AUTO || $type === self::TYPE_TCP) {
+                $types = [self::TYPE_TCP];
+            } else {
+                throw new \RuntimeException("Cannot use FIFOs and UNIX sockets on windows");
             }
             $listenUri = "tcp://127.0.0.1:0";
+        } elseif ($type === self::TYPE_AUTO) {
+            $types = [self::TYPE_UNIX, self::TYPE_TCP, self::TYPE_FIFO];
         } else {
+            $types = [];
+            if ($type & self::TYPE_UNIX) {
+                $types []= self::TYPE_UNIX;
+            }
+            if ($type & self::TYPE_TCP) {
+                $types []= self::TYPE_TCP;
+            }
+            if ($type & self::TYPE_FIFO) {
+                $types []= self::TYPE_FIFO;
+            }
             $listenUri = "unix://".$uri;
         }
 
-        if (!$useFIFO) {
-            try {
-                $this->server = \stream_socket_server($listenUri, $errno, $errstr, \STREAM_SERVER_BIND | \STREAM_SERVER_LISTEN);
-            } catch (\Throwable $e) {
+        $errors = [];
+        foreach ($types as $type) {
+            if ($type === self::TYPE_FIFO) {
+                if (!\posix_mkfifo($uri, 0777)) {
+                    $errors[$type] = "could not create the FIFO socket";
+                    continue;
+                }
+                $error = '';
+                try {
+                    // Open in r+w mode to prevent blocking if there is no reader
+                    $this->server = \fopen($uri, 'r+');
+                } catch (\Throwable $e) {
+                    $error = "$e";
+                }
+                if ($this->server) {
+                    \stream_set_blocking($this->server, false);
+                    break;
+                }
+                $errors[$type] = "could not connect to the FIFO socket: $error";
+            } else {
+                $listenUri = $type === self::TYPE_TCP ? "tcp://127.0.0.1:0" : "unix://".$uri;
+                try {
+                    $this->server = \stream_socket_server($listenUri, $errno, $errstr, \STREAM_SERVER_BIND | \STREAM_SERVER_LISTEN);
+                } catch (\Throwable $e) {
+                    $errno = -1;
+                    $errstr = "exception: $e";
+                }
+                if ($this->server) {
+                    if ($type === self::TYPE_TCP) {
+                        $name = \stream_socket_get_name($this->server, false);
+                        $port = \substr($name, \strrpos($name, ":") + 1);
+                        try {
+                            if (!\file_put_contents($this->uri, "tcp://127.0.0.1:".$port)) {
+                                $errors[$type] = 'could not create URI file';
+                                $this->server = null;
+                            }
+                        } catch (\Throwable $e) {
+                            $errors[$type] = "could not create URI file: $e";
+                            $this->server = null;
+                        }
+                        if (!$this->server) {
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                $errors[$type] = "(errno: $errno) $errstr";
             }
         }
 
-        $fifo = false;
         if (!$this->server) {
-            if ($isWindows) {
-                throw new \RuntimeException(\sprintf("Could not create IPC server: (Errno: %d) %s", $errno, $errstr));
-            }
-            if (!\posix_mkfifo($uri, 0777)) {
-                throw new \RuntimeException(\sprintf("Could not create the FIFO socket, and could not create IPC server: (Errno: %d) %s", $errno, $errstr));
-            }
-            if (!$this->server = \fopen($uri, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
-                throw new \RuntimeException(\sprintf("Could not connect to the FIFO socket, and could not create IPC server: (Errno: %d) %s", $errno, $errstr));
-            }
-            \stream_set_blocking($this->server, false);
-            $fifo = true;
-        }
-
-        if ($isWindows) {
-            $name = \stream_socket_get_name($this->server, false);
-            $port = \substr($name, \strrpos($name, ":") + 1);
-            \file_put_contents($this->uri, "tcp://127.0.0.1:".$port);
+            throw new IpcServerException($errors);
         }
 
         $acceptor = &$this->acceptor;
-        $this->watcher = Loop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $fifo): void {
-            if ($fifo) {
+        $this->watcher = Loop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $type): void {
+            if ($type === self::TYPE_FIFO) {
                 $length = \unpack('v', \fread($server, 2))[1];
                 if (!$length) {
                     return; // Could not accept, wrong length read

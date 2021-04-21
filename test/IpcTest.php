@@ -2,6 +2,7 @@
 
 namespace Amp\Ipc\Test;
 
+use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\Parallel\Context\Process;
 use Amp\PHPUnit\AsyncTestCase;
@@ -11,10 +12,10 @@ use function Amp\Ipc\connect;
 
 class IpcTest extends AsyncTestCase
 {
-    /** @dataProvider provideUriFifo */
-    public function testBasicIPC(string $uri, bool $fifo)
+    /** @dataProvider provideUriType */
+    public function testBasicIPC(string $uri, int $type)
     {
-        $process = new Process([__DIR__.'/Fixtures/server.php', $uri, $fifo]);
+        $process = new Process([__DIR__.'/Fixtures/server.php', $uri, $type]);
         yield $process->start();
 
         $recvUri = yield $process->receive();
@@ -33,10 +34,10 @@ class IpcTest extends AsyncTestCase
         $this->assertNull(yield $process->join());
     }
 
-    /** @dataProvider provideUriFifo */
-    public function testIPCDisconectWhileReading(string $uri, bool $fifo)
+    /** @dataProvider provideUriType */
+    public function testIPCDisconectWhileReading(string $uri, int $type)
     {
-        $process = new Process([__DIR__.'/Fixtures/echoServer.php', $uri, $fifo]);
+        $process = new Process([__DIR__.'/Fixtures/echoServer.php', $uri, $type]);
         yield $process->start();
 
         $recvUri = yield $process->receive();
@@ -57,14 +58,17 @@ class IpcTest extends AsyncTestCase
         $this->assertNull(yield $process->join());
     }
 
-    public function provideUriFifo(): \Generator
+    public function provideUriType(): \Generator
     {
         foreach (['', \sys_get_temp_dir().'/pony'] as $uri) {
             if (\strncasecmp(\PHP_OS, "WIN", 3) === 0) {
-                yield [$uri, false];
+                yield [$uri, IpcServer::TYPE_AUTO];
+                yield [$uri, IpcServer::TYPE_TCP];
             } else {
-                yield [$uri, true];
-                yield [$uri, false];
+                yield [$uri, IpcServer::TYPE_AUTO];
+                yield [$uri, IpcServer::TYPE_TCP];
+                yield [$uri, IpcServer::TYPE_UNIX];
+                yield [$uri, IpcServer::TYPE_FIFO];
             }
         }
     }

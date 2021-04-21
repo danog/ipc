@@ -11,7 +11,7 @@ use Amp\Parallel\Sync\Channel;
 use function Amp\delay;
 
 return function (Channel $channel) use ($argv) {
-    $server = new IpcServer($argv[1], $argv[2] === "1" ? true : false);
+    $server = new IpcServer($argv[1], (int) $argv[2]);
 
     yield $channel->send($server->getUri());
 
