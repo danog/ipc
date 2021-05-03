@@ -51,14 +51,14 @@ class IpcServer
             }
         } elseif ($type === self::TYPE_AUTO) {
             $types = [];
-            if (strlen($uri) <= 104) {
+            if (\strlen($uri) <= 104) {
                 $types []= self::TYPE_UNIX;
             }
             $types []= self::TYPE_FIFO;
             $types []= self::TYPE_TCP;
         } else {
             $types = [];
-            if ($type & self::TYPE_UNIX && strlen($uri) <= 104) {
+            if ($type & self::TYPE_UNIX && \strlen($uri) <= 104) {
                 $types []= self::TYPE_UNIX;
             }
             if ($type & self::TYPE_TCP) {

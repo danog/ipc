@@ -60,7 +60,7 @@ class IpcTest extends AsyncTestCase
 
     public function provideUriType(): \Generator
     {
-        foreach (['', \sys_get_temp_dir().'/pony', \sys_get_temp_dir().'/'.str_repeat('a', 200)] as $uri) {
+        foreach (['', \sys_get_temp_dir().'/pony', \sys_get_temp_dir().'/'.\str_repeat('a', 200)] as $uri) {
             if (\strncasecmp(\PHP_OS, "WIN", 3) === 0) {
                 yield [$uri, IpcServer::TYPE_AUTO];
                 yield [$uri, IpcServer::TYPE_TCP];
