@@ -49,12 +49,16 @@ class IpcServer
             } else {
                 throw new \RuntimeException("Cannot use FIFOs and UNIX sockets on windows");
             }
-            $listenUri = "tcp://127.0.0.1:0";
         } elseif ($type === self::TYPE_AUTO) {
-            $types = [self::TYPE_UNIX, self::TYPE_TCP, self::TYPE_FIFO];
+            $types = [];
+            if (strlen($uri) <= 104) {
+                $types []= self::TYPE_UNIX;
+            }
+            $types []= self::TYPE_FIFO;
+            $types []= self::TYPE_TCP;
         } else {
             $types = [];
-            if ($type & self::TYPE_UNIX) {
+            if ($type & self::TYPE_UNIX && strlen($uri) <= 104) {
                 $types []= self::TYPE_UNIX;
             }
             if ($type & self::TYPE_TCP) {
@@ -63,7 +67,6 @@ class IpcServer
             if ($type & self::TYPE_FIFO) {
                 $types []= self::TYPE_FIFO;
             }
-            $listenUri = "unix://".$uri;
         }
 
         $errors = [];
