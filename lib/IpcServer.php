@@ -72,8 +72,13 @@ class IpcServer
         $errors = [];
         foreach ($types as $type) {
             if ($type === self::TYPE_FIFO) {
-                if (!\posix_mkfifo($uri, 0777)) {
-                    $errors[$type] = "could not create the FIFO socket";
+                try {
+                    if (!\posix_mkfifo($uri, 0777)) {
+                        $errors[$type] = "could not create the FIFO socket";
+                        continue;
+                    }
+                } catch (\Throwable $e) {
+                    $errors[$type] = "could not create the FIFO socket: $e";
                     continue;
                 }
                 $error = '';
@@ -98,9 +103,9 @@ class IpcServer
                 }
                 if ($this->server) {
                     if ($type === self::TYPE_TCP) {
-                        $name = \stream_socket_get_name($this->server, false);
-                        $port = \substr($name, \strrpos($name, ":") + 1);
                         try {
+                            $name = \stream_socket_get_name($this->server, false);
+                            $port = \substr($name, \strrpos($name, ":") + 1);
                             if (!\file_put_contents($this->uri, "tcp://127.0.0.1:".$port)) {
                                 $errors[$type] = 'could not create URI file';
                                 $this->server = null;

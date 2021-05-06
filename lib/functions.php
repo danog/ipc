@@ -58,9 +58,9 @@ function connect(string $uri): Promise
         }
 
         $sockets = [
-                $prefix."2",
-                $prefix."1",
-            ];
+            $prefix."2",
+            $prefix."1",
+        ];
 
         foreach ($sockets as $k => &$socket) {
             if (!\posix_mkfifo($socket, 0777)) {
@@ -83,6 +83,8 @@ function connect(string $uri): Promise
         \stream_set_write_buffer($tempSocket, 0);
 
         if (!\fwrite($tempSocket, \pack('v', \strlen($prefix)).$prefix)) {
+            \fclose($tempSocket);
+            $tempSocket = null;
             throw new \RuntimeException("Failure sending request to FIFO server");
         }
         \fclose($tempSocket);
