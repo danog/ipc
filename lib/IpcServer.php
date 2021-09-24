@@ -95,10 +95,11 @@ class IpcServer
                 $errors[$type] = "could not connect to the FIFO socket: $error";
             } else {
                 $listenUri = $type === self::TYPE_TCP ? "tcp://127.0.0.1:0" : "unix://".$uri;
+                $errno = -1;
+                $errstr = 'no error';
                 try {
                     $this->server = \stream_socket_server($listenUri, $errno, $errstr, \STREAM_SERVER_BIND | \STREAM_SERVER_LISTEN);
                 } catch (\Throwable $e) {
-                    $errno = -1;
                     $errstr = "exception: $e";
                 }
                 if ($this->server) {
