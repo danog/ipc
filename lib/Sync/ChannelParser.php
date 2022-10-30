@@ -39,16 +39,13 @@ final class ChannelParser extends Parser
     }
 
     /**
-     * @param callable $push
-     *
-     * @return \Generator
-     *
      * @throws \Amp\Ipc\Sync\ChannelException
      * @throws \Amp\Ipc\Sync\SerializationException
      */
     private static function parser(callable $push): \Generator
     {
         while (true) {
+            /** @var string */
             $header = yield self::HEADER_LENGTH;
             $data = \unpack("Cprefix/Llength", $header);
 

@@ -29,7 +29,6 @@ final class PanicError extends \Error
     /**
      * Returns the class name of the uncaught exception.
      *
-     * @return string
      */
     public function getName(): string
     {
@@ -39,7 +38,6 @@ final class PanicError extends \Error
     /**
      * Gets the stack trace at the point the panic occurred.
      *
-     * @return string
      */
     public function getPanicTrace(): string
     {

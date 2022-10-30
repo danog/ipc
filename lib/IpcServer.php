@@ -2,11 +2,10 @@
 
 namespace Amp\Ipc;
 
-use Amp\Deferred;
+use Amp\DeferredFuture;
 use Amp\Ipc\Sync\ChannelledSocket;
-use Amp\Loop;
-use Amp\Promise;
-use Amp\Success;
+use AssertionError;
+use Revolt\EventLoop;
 
 class IpcServer
 {
@@ -17,14 +16,11 @@ class IpcServer
     /** @var resource|null */
     private $server;
 
-    /** @var Deferred */
-    private $acceptor;
+    private ?DeferredFuture $acceptor = null;
 
-    /** @var string|null */
-    private $watcher;
+    private string $watcher;
 
-    /** @var string|null */
-    private $uri;
+    private string $uri;
 
     /**
      * @param string       $uri  Local endpoint on which to listen for requests
@@ -40,7 +36,6 @@ class IpcServer
             @\unlink($uri);
         }
         $this->uri = $uri;
-
 
         $isWindows = \strncasecmp(\PHP_OS, "WIN", 3) === 0;
         if ($isWindows) {
@@ -106,7 +101,11 @@ class IpcServer
                     if ($type === self::TYPE_TCP) {
                         try {
                             $name = \stream_socket_get_name($this->server, false);
-                            $port = \substr($name, \strrpos($name, ":") + 1);
+                            $pos = \strrpos($name, ":");
+                            if ($pos === false) {
+                                throw new AssertionError('No port');
+                            }
+                            $port = \substr($name, $pos + 1);
                             if (!\file_put_contents($this->uri, "tcp://127.0.0.1:".$port)) {
                                 $errors[$type] = 'could not create URI file';
                                 $this->server = null;
@@ -130,7 +129,7 @@ class IpcServer
         }
 
         $acceptor = &$this->acceptor;
-        $this->watcher = Loop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $type): void {
+        $this->watcher = EventLoop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $type): void {
             if ($type === self::TYPE_FIFO) {
                 $length = \unpack('v', \fread($server, 2))[1];
                 if (!$length) {
@@ -138,12 +137,12 @@ class IpcServer
                 }
 
                 $prefix = \fread($server, $length);
-                $sockets = [
+                $sockets = [];
+
+                foreach ([
                     $prefix.'1',
                     $prefix.'2',
-                ];
-
-                foreach ($sockets as $k => &$socket) {
+                ] as $k => $socket) {
                     if (@\filetype($socket) !== 'fifo') {
                         if ($k) {
                             \fclose($sockets[0]);
@@ -152,7 +151,7 @@ class IpcServer
                     }
 
                     // Open in either read or write mode to send a close signal when done
-                    if (!$socket = \fopen($socket, $k ? 'w' : 'r')) {
+                    if (!$sockets[$k] = \fopen($socket, $k ? 'w' : 'r')) {
                         if ($k) {
                             \fclose($sockets[0]);
                         }
@@ -173,14 +172,12 @@ class IpcServer
 
             \assert($deferred !== null);
 
-            $deferred->resolve($channel);
+            $deferred->complete($channel);
 
-            if (!$acceptor) {
-                Loop::disable($watcher);
-            }
+            EventLoop::disable($watcher);
         });
 
-        Loop::disable($this->watcher);
+        EventLoop::disable($this->watcher);
     }
 
     public function __destruct()
@@ -189,24 +186,22 @@ class IpcServer
     }
 
     /**
-     * @return Promise<ChannelledSocket|null>
-     *
      * @throws PendingAcceptError If another accept request is pending.
      */
-    public function accept(): Promise
+    public function accept(): ?ChannelledSocket
     {
         if ($this->acceptor) {
             throw new PendingAcceptError;
         }
 
         if (!$this->server) {
-            return new Success(); // Resolve with null when server is closed.
+            return null; // Resolve with null when server is closed.
         }
 
-        $this->acceptor = new Deferred;
-        Loop::enable($this->watcher);
+        $this->acceptor = new DeferredFuture;
+        EventLoop::enable($this->watcher);
 
-        return $this->acceptor->promise();
+        return $this->acceptor->getFuture()->await();
     }
 
     /**
@@ -214,27 +209,22 @@ class IpcServer
      */
     public function close(): void
     {
-        Loop::cancel($this->watcher);
+        EventLoop::cancel($this->watcher);
 
         if ($this->acceptor) {
             $acceptor = $this->acceptor;
             $this->acceptor = null;
-            $acceptor->resolve();
+            $acceptor->complete();
         }
 
         if ($this->server) {
-            \fclose($this->server);
+            $server = $this->server;
             $this->server = null;
-        }
-        if ($this->uri !== null) {
+            \fclose($server);
             @\unlink($this->uri);
-            $this->uri = null;
         }
     }
 
-    /**
-     * @return bool
-     */
     public function isClosed(): bool
     {
         return $this->server === null;
@@ -243,27 +233,26 @@ class IpcServer
     /**
      * References the accept watcher.
      *
-     * @see Loop::reference()
+     * @see EventLoop::reference()
      */
     final public function reference(): void
     {
-        Loop::reference($this->watcher);
+        EventLoop::reference($this->watcher);
     }
 
     /**
      * Unreferences the accept watcher.
      *
-     * @see Loop::unreference()
+     * @see EventLoop::unreference()
      */
     final public function unreference(): void
     {
-        Loop::unreference($this->watcher);
+        EventLoop::unreference($this->watcher);
     }
 
     /**
      * Get endpoint to which clients should connect.
      *
-     * @return string
      */
     public function getUri(): string
     {
