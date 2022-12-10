@@ -14,12 +14,12 @@ require 'vendor/autoload.php';
 
 $server = new IpcServer($argv[1], (int) $argv[2]);
 
-async(function () use ($server) {
-    delay(1);
-    echo $server->getUri().PHP_EOL;
-});
+$socket = async($server->accept(...));
 
-$socket = $server->accept();
+delay(0.001);
+echo $server->getUri().PHP_EOL;
+
+$socket = $socket->await();
 
 if (!$socket instanceof ChannelledSocket) {
     throw new \RuntimeException('Socket is not instance of ChannelledSocket');

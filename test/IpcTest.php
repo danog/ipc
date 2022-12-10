@@ -6,6 +6,7 @@ use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\PHPUnit\AsyncTestCase;
 use Amp\Process\Process;
+use Revolt\EventLoop;
 
 use function Amp\async;
 use function Amp\ByteStream\splitLines;
@@ -13,6 +14,10 @@ use function Amp\Ipc\connect;
 
 class IpcTest extends AsyncTestCase
 {
+    public function test(): void
+    {
+        \var_dump(EventLoop::getDriver()::class);
+    }
     /** @dataProvider provideUriType */
     public function testBasicIPC(string $uri, int $type)
     {
