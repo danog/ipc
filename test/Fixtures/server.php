@@ -9,6 +9,9 @@ require 'vendor/autoload.php';
 use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 
+use function Amp\async;
+use function Amp\delay;
+
 $server = new IpcServer($argv[1], (int) $argv[2]);
 
 async(function () use ($server) {
