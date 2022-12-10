@@ -6,7 +6,6 @@ use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\PHPUnit\AsyncTestCase;
 use Amp\Process\Process;
-use Revolt\EventLoop;
 
 use function Amp\async;
 use function Amp\ByteStream\splitLines;
