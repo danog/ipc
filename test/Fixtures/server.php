@@ -11,7 +11,10 @@ use Amp\Ipc\Sync\ChannelledSocket;
 
 $server = new IpcServer($argv[1], (int) $argv[2]);
 
-echo $server->getUri().PHP_EOL;
+async(function () use ($server) {
+    delay(1);
+    echo $server->getUri().PHP_EOL;
+});
 
 $socket = $server->accept();
 

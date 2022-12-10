@@ -15,7 +15,7 @@ require 'vendor/autoload.php';
 $server = new IpcServer($argv[1], (int) $argv[2]);
 
 async(function () use ($server) {
-    delay(0.5);
+    delay(1);
     echo $server->getUri().PHP_EOL;
 });
 
