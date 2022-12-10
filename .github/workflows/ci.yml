@@ -64,7 +64,7 @@ jobs:
             composer info -D
 
       - name: Run tests
-        run: vendor/bin/phpunit ${{ matrix.phpunit-flags }}
+        run: vendor/bin/phpunit ${{ matrix.phpunit-flags }} --debug
 
       - name: Run psalm
         run: vendor/bin/psalm.phar
