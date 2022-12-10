@@ -1,7 +1,6 @@
 # IPC
 
-[![Build Status](https://img.shields.io/travis/danog/ipc/master.svg?style=flat-square)](https://travis-ci.org/danog/ipc)
-[![Build status](https://ci.appveyor.com/api/projects/status/1tcxa257p5dj52ck?svg=true)](https://ci.appveyor.com/project/danog/ipc)
+[![Continuous Integration](https://github.com/danog/ipc/actions/workflows/ci.yml/badge.svg)](https://github.com/danog/ipc/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
 
 `danog/ipc` provides an async IPC server.
