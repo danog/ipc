@@ -4,31 +4,31 @@ ini_set('log_errors', 1);
 ini_set('error_log', '/tmp/amphp.log');
 error_log('Inited IPC test!');
 
+require 'vendor/autoload.php';
+
 use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\Parallel\Sync\Channel;
 
-return function (Channel $channel) use ($argv) {
-    $server = new IpcServer($argv[1], (int) $argv[2]);
+$server = new IpcServer($argv[1], (int) $argv[2]);
 
-    yield $channel->send($server->getUri());
+echo $server->getUri().PHP_EOL;
 
-    $socket = yield $server->accept();
+$socket = $server->accept();
 
-    if (!$socket instanceof ChannelledSocket) {
-        throw new \RuntimeException('Socket is not instance of ChannelledSocket');
-    }
+if (!$socket instanceof ChannelledSocket) {
+    throw new \RuntimeException('Socket is not instance of ChannelledSocket');
+}
 
-    $ping = yield $socket->receive();
+$ping = $socket->receive();
 
-    if ($ping !== 'ping') {
-        throw new \RuntimeException("Received $ping instead of ping!");
-    }
+if ($ping !== 'ping') {
+    throw new \RuntimeException("Received $ping instead of ping!");
+}
 
-    yield $socket->send('pong');
-    yield $socket->disconnect();
+$socket->send('pong');
+$socket->disconnect();
 
-    $server->close();
+$server->close();
 
-    return $server->accept();
-};
+$server->accept();

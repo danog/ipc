@@ -8,21 +8,22 @@ use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\Parallel\Sync\Channel;
 
-return function (Channel $channel) use ($argv) {
-    $server = new IpcServer($argv[1], (int) $argv[2]);
+require 'vendor/autoload.php';
 
-    yield $channel->send($server->getUri());
+$server = new IpcServer($argv[1], (int) $argv[2]);
 
-    $socket = yield $server->accept();
+echo $server->getUri().PHP_EOL;
 
-    if (!$socket instanceof ChannelledSocket) {
-        throw new \RuntimeException('Socket is not instance of ChannelledSocket');
-    }
+$socket = $server->accept();
 
-    while (yield $socket->receive());
-    yield $socket->disconnect();
+if (!$socket instanceof ChannelledSocket) {
+    throw new \RuntimeException('Socket is not instance of ChannelledSocket');
+}
 
-    $server->close();
+while ($socket->receive());
+$socket->disconnect();
 
-    return $server->accept();
-};
+$server->close();
+
+$server->accept();
+

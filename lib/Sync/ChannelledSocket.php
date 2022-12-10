@@ -88,7 +88,7 @@ final class ChannelledSocket implements Channel
         }
         $this->channel->send(new ChannelCloseReq);
         do {
-            $data = ($this->closePromise ? $this->closePromise->getFuture() : $this->channel->receive())->await();
+            $data = ($this->closePromise ? $this->closePromise->getFuture()->await() : $this->channel->receive());
             if ($this->closePromise) {
                 $this->closePromise = null;
             }

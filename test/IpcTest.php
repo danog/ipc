@@ -4,10 +4,12 @@ namespace Amp\Ipc\Test;
 
 use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
-use Amp\Parallel\Context\Process;
 use Amp\PHPUnit\AsyncTestCase;
+use Amp\Process\Process;
 
+use function Amp\async;
 use function Amp\asyncCall;
+use function Amp\ByteStream\splitLines;
 use function Amp\Ipc\connect;
 
 class IpcTest extends AsyncTestCase
@@ -15,47 +17,49 @@ class IpcTest extends AsyncTestCase
     /** @dataProvider provideUriType */
     public function testBasicIPC(string $uri, int $type)
     {
-        $process = new Process([__DIR__.'/Fixtures/server.php', $uri, $type]);
-        yield $process->start();
+        $process = Process::start([PHP_BINARY, __DIR__.'/Fixtures/server.php', $uri, $type]);
 
-        $recvUri = yield $process->receive();
+        foreach (splitLines($process->getStdout()) as $recvUri) {
+            break;
+        }
         if ($uri) {
             $this->assertEquals($uri, $recvUri);
         }
 
-        $client = yield connect($recvUri);
+        $client = connect($recvUri);
         $this->assertInstanceOf(ChannelledSocket::class, $client);
 
-        yield $client->send('ping');
-        $this->assertEquals('pong', yield $client->receive());
+        $client->send('ping');
+        $this->assertEquals('pong', $client->receive());
 
-        yield $client->disconnect();
+        $client->disconnect();
 
-        $this->assertNull(yield $process->join());
+        $this->assertEquals(0, $process->join());
     }
 
     /** @dataProvider provideUriType */
     public function testIPCDisconectWhileReading(string $uri, int $type)
     {
-        $process = new Process([__DIR__.'/Fixtures/echoServer.php', $uri, $type]);
-        yield $process->start();
+        $process = Process::start([PHP_BINARY, __DIR__.'/Fixtures/echoServer.php', $uri, $type]);
 
-        $recvUri = yield $process->receive();
+        foreach (splitLines($process->getStdout()) as $recvUri) {
+            break;
+        }
         if ($uri) {
             $this->assertEquals($uri, $recvUri);
         }
 
-        $client = yield connect($recvUri);
+        $client = connect($recvUri);
         $this->assertInstanceOf(ChannelledSocket::class, $client);
 
-        asyncCall(
+        async(
             static function () use ($client) {
-                while (yield $client->receive());
+                while ($client->receive());
             }
         );
-        yield $client->disconnect();
+        $client->disconnect();
 
-        $this->assertNull(yield $process->join());
+        $this->assertEquals(0, $process->join());
     }
 
     public function provideUriType(): \Generator
