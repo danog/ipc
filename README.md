@@ -1,7 +1,7 @@
 # IPC
 
 [![Continuous Integration](https://github.com/danog/ipc/actions/workflows/ci.yml/badge.svg)](https://github.com/danog/ipc/actions/workflows/ci.yml)
-![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 `danog/ipc` provides an async IPC server.
 
