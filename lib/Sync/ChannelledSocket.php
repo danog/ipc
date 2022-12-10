@@ -64,15 +64,16 @@ final class ChannelledSocket implements Channel
                 $this->disconnect();
                 return null;
             }
-            if ($chunk instanceof ChannelCloseReq) {
-                $this->disconnect();
-                return null;
-            }
 
             $this->parser->push($chunk);
         }
 
-        return $this->received->shift();
+        $received = $this->received->shift();
+        if ($received instanceof ChannelCloseReq) {
+            $this->disconnect();
+            return null;
+        }
+        return $received;
     }
 
     /**
