@@ -7,11 +7,17 @@ error_log('Inited IPC test!');
 use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 
+use function Amp\async;
+use function Amp\delay;
+
 require 'vendor/autoload.php';
 
 $server = new IpcServer($argv[1], (int) $argv[2]);
 
-echo $server->getUri().PHP_EOL;
+async(function () use ($server) {
+    delay(0.5);
+    echo $server->getUri().PHP_EOL;
+});
 
 $socket = $server->accept();
 

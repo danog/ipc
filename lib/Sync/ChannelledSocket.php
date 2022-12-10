@@ -22,8 +22,7 @@ final class ChannelledSocket implements Channel
 
     /**
      * Creates a new channel from the given stream objects. Note that $read and $write can be the same object.
-     * 
-     * @param null|callable(): void $close
+     *
      */
     public function __construct(private ReadableStream $read, private WritableStream $write)
     {
@@ -87,7 +86,8 @@ final class ChannelledSocket implements Channel
         $this->closed = true;
         try {
             $this->write->write($this->parser->encode(new ChannelCloseReq));
-        } catch (\Throwable) {}
+        } catch (\Throwable) {
+        }
         $this->read->close();
         $this->write->close();
     }
