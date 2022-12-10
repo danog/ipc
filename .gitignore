@@ -6,3 +6,5 @@ vendor
 .php_cs.cache
 coverage
 .phpunit.result.cache
+a.php
+b.php

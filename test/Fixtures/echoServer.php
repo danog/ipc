@@ -6,7 +6,6 @@ error_log('Inited IPC test!');
 
 use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
-use Amp\Parallel\Sync\Channel;
 
 require 'vendor/autoload.php';
 
@@ -26,4 +25,3 @@ $socket->disconnect();
 $server->close();
 
 $server->accept();
-

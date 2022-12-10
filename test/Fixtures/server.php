@@ -8,7 +8,6 @@ require 'vendor/autoload.php';
 
 use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
-use Amp\Parallel\Sync\Channel;
 
 $server = new IpcServer($argv[1], (int) $argv[2]);
 

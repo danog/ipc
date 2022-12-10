@@ -2,6 +2,8 @@
 
 namespace Amp\Ipc;
 
+use Amp\ByteStream\ReadableResourceStream;
+use Amp\ByteStream\WritableResourceStream;
 use Amp\DeferredFuture;
 use Amp\Ipc\Sync\ChannelledSocket;
 use AssertionError;
@@ -158,13 +160,19 @@ class IpcServer
                         return; // Could not open fifo
                     }
                 }
-                $channel = new ChannelledSocket(...$sockets);
+                $channel = new ChannelledSocket(
+                    new ReadableResourceStream($sockets[0]),
+                    new WritableResourceStream($sockets[1])
+                );
             } else {
                 // Error reporting suppressed since stream_socket_accept() emits E_WARNING on client accept failure.
                 if (!$client = @\stream_socket_accept($server, 0)) {  // Timeout of 0 to be non-blocking.
                     return; // Accepting client failed.
                 }
-                $channel = new ChannelledSocket($client, $client);
+                $channel = new ChannelledSocket(
+                    new ReadableResourceStream($client),
+                    new WritableResourceStream($client)
+                );
             }
 
             $deferred = $acceptor;

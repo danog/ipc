@@ -8,7 +8,6 @@ use Amp\PHPUnit\AsyncTestCase;
 use Amp\Process\Process;
 
 use function Amp\async;
-use function Amp\asyncCall;
 use function Amp\ByteStream\splitLines;
 use function Amp\Ipc\connect;
 

@@ -2,6 +2,6 @@
 
 namespace Amp\Ipc\Sync;
 
-final class ChannelCloseReq implements ChannelCloseMsg
+final class ChannelCloseReq
 {
 }

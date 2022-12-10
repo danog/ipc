@@ -2,107 +2,33 @@
 
 namespace Amp\Ipc\Sync;
 
-use Amp\ByteStream\ReadableResourceStream;
-use Amp\ByteStream\WritableResourceStream;
-use Amp\DeferredFuture;
-use AssertionError;
+use Amp\ByteStream\ReadableStream;
+use Amp\ByteStream\StreamException;
+use Amp\ByteStream\WritableStream;
+use SplQueue;
 
+/**
+ * An asynchronous channel for sending data between threads and processes.
+ *
+ * Supports full duplex read and write.
+ */
 final class ChannelledSocket implements Channel
 {
-    private const ESTABLISHED = 0;
+    private SplQueue $received;
 
-    private const GOT_FIN_MASK = 1;
-    private const GOT_ACK_MASK = 2;
-
-    private const GOT_ALL_MASK = 3;
-
-    private ChannelledStream $channel;
-
-    private ReadableResourceStream $read;
-
-    private WritableResourceStream $write;
+    private ChannelParser $parser;
 
     private bool $closed = false;
 
-    private int $state = self::ESTABLISHED;
-
-    private ?DeferredFuture $closePromise = null;
-
-    private bool $reading = false;
-
     /**
-     * @param resource $read Readable stream resource.
-     * @param resource $write Writable stream resource.
-     *
-     * @throws \Error If a stream resource is not given for $resource.
+     * Creates a new channel from the given stream objects. Note that $read and $write can be the same object.
+     * 
+     * @param null|callable(): void $close
      */
-    public function __construct($read, $write)
+    public function __construct(private ReadableStream $read, private WritableStream $write)
     {
-        $this->channel = new ChannelledStream(
-            $this->read = new ReadableResourceStream($read),
-            $this->write = new WritableResourceStream($write)
-        );
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function receive(): mixed
-    {
-        if ($this->closed) {
-            return null;
-        }
-        $this->reading = true;
-        $data = $this->channel->receive();
-        $this->reading = false;
-
-        if ($data instanceof ChannelCloseReq) {
-            $this->channel->send(new ChannelCloseAck);
-            $this->state = self::GOT_FIN_MASK;
-            $this->disconnect();
-            if ($this->closePromise) {
-                $this->closePromise->complete($data);
-            }
-            return null;
-        } elseif ($data instanceof ChannelCloseAck) {
-            if (!$this->closePromise) {
-                throw new AssertionError('Must have a close promise!');
-            }
-            $this->closePromise->complete($data);
-            return null;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Cleanly disconnect from other endpoint.
-     */
-    public function disconnect(): void
-    {
-        if ($this->closed) {
-            return;
-        }
-        if ($this->reading) {
-            $this->closePromise = new DeferredFuture;
-        }
-        $this->channel->send(new ChannelCloseReq);
-        do {
-            $data = ($this->closePromise ? $this->closePromise->getFuture()->await() : $this->channel->receive());
-            if ($this->closePromise) {
-                $this->closePromise = null;
-            }
-            if ($data instanceof ChannelCloseReq) {
-                $this->channel->send(new ChannelCloseAck);
-                $this->state |= self::GOT_FIN_MASK;
-            } elseif ($data instanceof ChannelCloseAck) {
-                $this->state |= self::GOT_ACK_MASK;
-            }
-        } while ($this->state !== self::GOT_ALL_MASK);
-
-        $this->closed = true;
-
-        $this->close();
+        $this->received = new \SplQueue;
+        $this->parser = new ChannelParser($this->received->push(...));
     }
 
     /**
@@ -113,30 +39,55 @@ final class ChannelledSocket implements Channel
         if ($this->closed) {
             throw new ChannelException('The channel was already closed!');
         }
-        $this->channel->send($data);
+        try {
+            $this->write->write($this->parser->encode($data));
+        } catch (StreamException $exception) {
+            throw new ChannelException("Sending on the channel failed. Did the context die?", 0, $exception);
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function unreference(): void
+    public function receive(): mixed
     {
-        $this->read->unreference();
+        while ($this->received->isEmpty()) {
+            try {
+                if ($this->closed) {
+                    return null;
+                }
+                $chunk = $this->read->read();
+            } catch (StreamException $exception) {
+                throw new ChannelException("Reading from the channel failed. Did the context die?", 0, $exception);
+            }
+
+            if ($chunk === null) {
+                $this->disconnect();
+                return null;
+            }
+            if ($chunk instanceof ChannelCloseReq) {
+                $this->disconnect();
+                return null;
+            }
+
+            $this->parser->push($chunk);
+        }
+
+        return $this->received->shift();
     }
 
     /**
-     * {@inheritdoc}
+     * Cleanly disconnect from other endpoint.
      */
-    public function reference(): void
+    public function disconnect(): void
     {
-        $this->read->reference();
-    }
-
-    /**
-     * Closes the read and write resource streams.
-     */
-    private function close(): void
-    {
+        if ($this->closed) {
+            return;
+        }
+        $this->closed = true;
+        try {
+            $this->write->write($this->parser->encode(new ChannelCloseReq));
+        } catch (\Throwable) {}
         $this->read->close();
         $this->write->close();
     }

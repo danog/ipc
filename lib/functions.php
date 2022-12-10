@@ -2,6 +2,8 @@
 
 namespace Amp\Ipc;
 
+use Amp\ByteStream\ReadableResourceStream;
+use Amp\ByteStream\WritableResourceStream;
 use Amp\Ipc\Sync\ChannelledSocket;
 
 /**
@@ -40,7 +42,10 @@ function connect(string $uri): ChannelledSocket
             }
             throw new \RuntimeException($message);
         }
-        return new ChannelledSocket($socket, $socket);
+        return new ChannelledSocket(
+            new ReadableResourceStream($socket),
+            new WritableResourceStream($socket)
+        );
     }
 
     $suffix = \bin2hex(\random_bytes(10));
@@ -83,5 +88,8 @@ function connect(string $uri): ChannelledSocket
     \fclose($tempSocket);
     unset($tempSocket);
 
-    return new ChannelledSocket(...$sockets);
+    return new ChannelledSocket(
+        new ReadableResourceStream($sockets[0]),
+        new WritableResourceStream($sockets[1]),
+    );
 }
