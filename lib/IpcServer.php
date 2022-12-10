@@ -40,6 +40,7 @@ class IpcServer
         $this->uri = $uri;
 
         $isWindows = \strncasecmp(\PHP_OS, "WIN", 3) === 0;
+        $isLinux = \strncasecmp(\PHP_OS, "LINUX", 5) === 0;
         if ($isWindows) {
             if ($type === self::TYPE_AUTO || $type === self::TYPE_TCP) {
                 $types = [self::TYPE_TCP];
@@ -51,7 +52,9 @@ class IpcServer
             if (\strlen($uri) <= 104) {
                 $types []= self::TYPE_UNIX;
             }
-            $types []= self::TYPE_FIFO;
+            if ($isLinux) {
+                $types []= self::TYPE_FIFO;
+            }
             $types []= self::TYPE_TCP;
         } else {
             $types = [];
@@ -61,7 +64,7 @@ class IpcServer
             if ($type & self::TYPE_TCP) {
                 $types []= self::TYPE_TCP;
             }
-            if ($type & self::TYPE_FIFO) {
+            if ($type & self::TYPE_FIFO && $isLinux) {
                 $types []= self::TYPE_FIFO;
             }
         }

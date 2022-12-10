@@ -14,10 +14,6 @@ use function Amp\Ipc\connect;
 
 class IpcTest extends AsyncTestCase
 {
-    public function test(): void
-    {
-        \var_dump(EventLoop::getDriver()::class);
-    }
     /** @dataProvider provideUriType */
     public function testBasicIPC(string $uri, int $type)
     {
