@@ -74,7 +74,9 @@ class IpcTest extends AsyncTestCase
                 if (\strlen($uri) < 200) {
                     yield [$uri, IpcServer::TYPE_UNIX];
                 }
-                yield [$uri, IpcServer::TYPE_FIFO];
+                if (\strncasecmp(\PHP_OS, "LINUX", 5) === 0) {
+                    yield [$uri, IpcServer::TYPE_FIFO];
+                }
             }
         }
     }
