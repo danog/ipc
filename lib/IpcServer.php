@@ -5,9 +5,12 @@ namespace Amp\Ipc;
 use Amp\ByteStream\ReadableResourceStream;
 use Amp\ByteStream\WritableResourceStream;
 use Amp\DeferredFuture;
+use Amp\Ipc\Sync\ChannelInitAck;
 use Amp\Ipc\Sync\ChannelledSocket;
 use AssertionError;
 use Revolt\EventLoop;
+
+use function Amp\async;
 
 class IpcServer
 {
@@ -18,6 +21,7 @@ class IpcServer
     /** @var resource|null */
     private $server;
 
+    /** @var DeferredFuture<ChannelledSocket> */
     private ?DeferredFuture $acceptor = null;
 
     private string $watcher;
@@ -167,6 +171,7 @@ class IpcServer
                     new ReadableResourceStream($sockets[0]),
                     new WritableResourceStream($sockets[1])
                 );
+                async($channel->send(...), new ChannelInitAck);
             } else {
                 // Error reporting suppressed since stream_socket_accept() emits E_WARNING on client accept failure.
                 if (!$client = @\stream_socket_accept($server, 0)) {  // Timeout of 0 to be non-blocking.

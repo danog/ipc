@@ -17,5 +17,9 @@ $clientHandler = function (ChannelledSocket $socket) {
 };
 
 $channel = connect(sys_get_temp_dir().'/test');
-async($clientHandler, $channel);
+
+$thread = async($clientHandler, $channel);
+
 $channel->send('ping');
+
+$thread->await();

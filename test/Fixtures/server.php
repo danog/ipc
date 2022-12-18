@@ -9,17 +9,11 @@ require 'vendor/autoload.php';
 use Amp\Ipc\IpcServer;
 use Amp\Ipc\Sync\ChannelledSocket;
 
-use function Amp\async;
-use function Amp\delay;
-
 $server = new IpcServer($argv[1], (int) $argv[2]);
 
-$socket = async($server->accept(...));
-
-delay(0.001);
 echo $server->getUri().PHP_EOL;
 
-$socket = $socket->await();
+$socket = $server->accept();
 
 if (!$socket instanceof ChannelledSocket) {
     throw new \RuntimeException('Socket is not instance of ChannelledSocket');
