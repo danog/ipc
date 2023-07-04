@@ -16,64 +16,61 @@ composer require danog/ipc
 Server:
 
 ```php
-<?php
+<?php declare(strict_types=1);
 
 require 'vendor/autoload.php';
 
 use Amp\Ipc\Sync\ChannelledSocket;
-use Amp\Loop;
 
-use function Amp\asyncCall;
+use function Amp\async;
 use function Amp\Ipc\listen;
 
-Loop::run(static function () {
-    $clientHandler = function (ChannelledSocket $socket) {
-        echo "Accepted connection".PHP_EOL;
+$clientHandler = function (ChannelledSocket $socket) {
+    echo "Accepted connection".PHP_EOL;
 
-        while ($payload = yield $socket->receive()) {
-            echo "Received $payload".PHP_EOL;
-            if ($payload === 'ping') {
-                yield $socket->send('pong');
-                yield $socket->disconnect();
-            }
+    while ($payload = $socket->receive()) {
+        echo "Received $payload".PHP_EOL;
+        if ($payload === 'ping') {
+            $socket->send('pong');
+            $socket->disconnect();
         }
-        echo "Closed connection".PHP_EOL."==========".PHP_EOL;
-    };
-
-    $server = listen(\sys_get_temp_dir().'/test');
-    while ($socket = yield $server->accept()) {
-        asyncCall($clientHandler, $socket);
     }
-});
+    echo "Closed connection".PHP_EOL."==========".PHP_EOL;
+};
 
+$server = listen(sys_get_temp_dir().'/test');
+while ($socket = $server->accept()) {
+    async($clientHandler, $socket);
+}
 ```
 
 Client:
 
 ```php
-<?php
+<?php declare(strict_types=1);
 
 require 'vendor/autoload.php';
 
 use Amp\Ipc\Sync\ChannelledSocket;
-use Amp\Loop;
 
-use function Amp\asyncCall;
+use function Amp\async;
 use function Amp\Ipc\connect;
 
-Loop::run(static function () {
-    $clientHandler = function (ChannelledSocket $socket) {
-        echo "Created connection.".PHP_EOL;
+$clientHandler = function (ChannelledSocket $socket) {
+    echo "Created connection.".PHP_EOL;
 
-        while ($payload = yield $socket->receive()) {
-            echo "Received $payload".PHP_EOL;
-        }
-        echo "Closed connection".PHP_EOL;
-    };
+    while ($payload = $socket->receive()) {
+        echo "Received $payload".PHP_EOL;
+    }
+    echo "Closed connection".PHP_EOL;
+};
 
-    $channel = yield connect(\sys_get_temp_dir().'/test');
-    asyncCall($clientHandler, $channel);
-    yield $channel->send('ping');
-});
+$channel = connect(sys_get_temp_dir().'/test');
+
+$thread = async($clientHandler, $channel);
+
+$channel->send('ping');
+
+$thread->await();
 ```
 
