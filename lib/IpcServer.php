@@ -137,7 +137,7 @@ class IpcServer
             throw new IpcServerException($errors);
         }
 
-	/** @psalm-suppress UnsupportedPropertyReferenceUsage */
+        /** @psalm-suppress UnsupportedPropertyReferenceUsage */
         $acceptor = &$this->acceptor;
         $this->watcher = EventLoop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $type): void {
             if ($type === self::TYPE_FIFO) {
