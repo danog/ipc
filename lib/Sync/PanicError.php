@@ -18,7 +18,7 @@ final class PanicError extends \Error
      * @param string          $trace    The panic stack trace.
      * @param \Throwable|null $previous Previous exception.
      */
-    public function __construct(string $name, string $message = '', string $trace = '', \Throwable $previous = null)
+    public function __construct(string $name, string $message = '', string $trace = '', ?\Throwable $previous = null)
     {
         parent::__construct($message, 0, $previous);
 

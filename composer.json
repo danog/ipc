@@ -26,16 +26,16 @@
     ],
     "require": {
         "php": ">=8.1",
-        "amphp/byte-stream": "^2",
-        "amphp/parser": "^1"
+        "amphp/byte-stream": "^2.1.1",
+        "amphp/parser": "^1.1.1",
+        "amphp/parallel": "^2.3"
     },
     "require-dev": {
         "amphp/amp": "v3.x-dev",
-        "amphp/parallel": "v2.x-dev",
-        "phpunit/phpunit": "^9",
+        "phpunit/phpunit": "^9.6.22",
         "amphp/phpunit-util": "v3.x-dev",
         "amphp/php-cs-fixer-config": "v2.x-dev",
-        "psalm/phar": "^5"
+        "psalm/phar": "^5.26.1"
     },
     "autoload": {
         "psr-4": {

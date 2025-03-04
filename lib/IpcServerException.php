@@ -15,7 +15,7 @@ final class IpcServerException extends \Exception
     public function __construct(
         array $messages,
         int $code = 0,
-        \Throwable $previous = null
+        ?\Throwable $previous = null
     ) {
         $message = "Could not create IPC server: ";
         foreach ($messages as $type => $error) {
