@@ -26,9 +26,9 @@
     ],
     "require": {
         "php": ">=8.1",
-        "amphp/byte-stream": "^2.1.1",
+        "amphp/byte-stream": "^2.1.2",
         "amphp/parser": "^1.1.1",
-        "amphp/parallel": "^2.3"
+        "amphp/parallel": "^2.3.1"
     },
     "require-dev": {
         "amphp/amp": "v3.x-dev",
