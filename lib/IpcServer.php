@@ -28,6 +28,12 @@ class IpcServer
 
     private string $uri;
 
+    /** UNIX socket listening with ext-sockets (Windows), accepted with socket_accept */
+    private ?\Socket $listener = null;
+
+    /** Path of the UNIX socket a Windows URI file points to */
+    private ?string $socketPath = null;
+
     /**
      * @param string       $uri  Local endpoint on which to listen for requests
      * @param self::TYPE_* $type Server type
@@ -43,39 +49,35 @@ class IpcServer
         }
         $this->uri = $uri;
 
-        $isWindows = \strncasecmp(\PHP_OS, "WIN", 3) === 0;
-        $isLinux = \strncasecmp(\PHP_OS, "LINUX", 5) === 0;
-        if ($isWindows) {
-            if ($type === self::TYPE_AUTO || $type === self::TYPE_TCP) {
-                $types = [self::TYPE_TCP];
-            } else {
-                throw new \RuntimeException("Cannot use FIFOs and UNIX sockets on windows");
-            }
-        } elseif ($type === self::TYPE_AUTO) {
-            $types = [];
-            if (\strlen($uri) <= 104) {
-                $types []= self::TYPE_UNIX;
-            }
-            if ($isLinux) {
-                $types []= self::TYPE_FIFO;
-            }
+        $isWindows = \PHP_OS_FAMILY === 'Windows';
+        $isLinux = \PHP_OS_FAMILY === 'Linux';
+        if ($type === self::TYPE_AUTO) {
+            $type = self::TYPE_UNIX | self::TYPE_FIFO | self::TYPE_TCP;
+        }
+        $types = [];
+        // On Windows, UNIX sockets are created with ext-sockets and have no path length limit (see listenUnixWindows)
+        if ($type & self::TYPE_UNIX && ($isWindows || \strlen($uri) <= 104)) {
+            $types []= self::TYPE_UNIX;
+        }
+        if ($type & self::TYPE_FIFO && $isLinux) {
+            $types []= self::TYPE_FIFO;
+        }
+        if ($type & self::TYPE_TCP) {
             $types []= self::TYPE_TCP;
-        } else {
-            $types = [];
-            if ($type & self::TYPE_UNIX && \strlen($uri) <= 104) {
-                $types []= self::TYPE_UNIX;
-            }
-            if ($type & self::TYPE_TCP) {
-                $types []= self::TYPE_TCP;
-            }
-            if ($type & self::TYPE_FIFO && $isLinux) {
-                $types []= self::TYPE_FIFO;
-            }
+        }
+        if (!$types && $isWindows) {
+            throw new \RuntimeException("Cannot use FIFOs on windows");
         }
 
         $errors = [];
         foreach ($types as $type) {
-            if ($type === self::TYPE_FIFO) {
+            if ($type === self::TYPE_UNIX && $isWindows) {
+                $error = $this->listenUnixWindows();
+                if ($error === null) {
+                    break;
+                }
+                $errors[$type] = $error;
+            } elseif ($type === self::TYPE_FIFO) {
                 try {
                     if (!\posix_mkfifo($uri, 0777)) {
                         $errors[$type] = "could not create the FIFO socket";
@@ -115,7 +117,7 @@ class IpcServer
                                 throw new AssertionError('No port');
                             }
                             $port = \substr($name, $pos + 1);
-                            if (!\file_put_contents($this->uri, "tcp://127.0.0.1:".$port)) {
+                            if (\file_put_contents($this->uri, "tcp://127.0.0.1:".$port) === false) {
                                 $errors[$type] = 'could not create URI file';
                                 $this->server = null;
                             }
@@ -139,8 +141,19 @@ class IpcServer
 
         /** @psalm-suppress UnsupportedPropertyReferenceUsage */
         $acceptor = &$this->acceptor;
-        $this->watcher = EventLoop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $type): void {
-            if ($type === self::TYPE_FIFO) {
+        $listener = $this->listener;
+        $this->watcher = EventLoop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $type, $listener): void {
+            if ($listener !== null) {
+                // The listener is non-blocking: a spurious wakeup returns false
+                if (!$client = @socket_accept($listener)) {
+                    return;
+                }
+                $client = socket_export_stream($client);
+                $channel = new ChannelledSocket(
+                    new ReadableResourceStream($client),
+                    new WritableResourceStream($client)
+                );
+            } elseif ($type === self::TYPE_FIFO) {
                 $length = \unpack('v', \fread($server, 2))[1];
                 if (!$length) {
                     return; // Could not accept, wrong length read
@@ -238,8 +251,61 @@ class IpcServer
             $server = $this->server;
             $this->server = null;
             \fclose($server);
+            $this->listener = null;
             @\unlink($this->uri);
+            if ($this->socketPath !== null) {
+                @\unlink($this->socketPath);
+            }
         }
+    }
+
+    /**
+     * Listens on a UNIX socket on Windows (10 1803+).
+     *
+     * PHP streams don't support AF_UNIX on Windows, ext-sockets does: the listening socket is exported to a stream to
+     * watch it with the event loop, and accepted connections are exported to streams.
+     * Clients can't recognize a socket file on Windows, so like with TCP, the URI is a file with the endpoint.
+     *
+     * @return string|null The error, or null on success
+     */
+    private function listenUnixWindows(): ?string
+    {
+        if (!\extension_loaded('sockets')) {
+            return 'the sockets extension is not loaded';
+        }
+        $path = $this->uri.'.sock';
+        if (\strlen($path) > 107) { // sun_path is 108 bytes long
+            $path = \sys_get_temp_dir().\DIRECTORY_SEPARATOR.'amp-ipc-'.\bin2hex(\random_bytes(10)).'.sock';
+        }
+        @\unlink($path);
+        try {
+            $socket = socket_create(\AF_UNIX, \SOCK_STREAM, 0);
+        } catch (\Throwable $e) {
+            return "could not create the UNIX socket: $e";
+        }
+        if (!$socket) {
+            return 'could not create the UNIX socket: '.socket_strerror(socket_last_error());
+        }
+        try {
+            if (!socket_bind($socket, $path)
+                || !socket_listen($socket)
+                || !socket_set_nonblock($socket)
+            ) {
+                $error = 'could not listen on the UNIX socket: '.socket_strerror(socket_last_error($socket));
+            } elseif (\file_put_contents($this->uri, 'unix://'.$path) === false) {
+                $error = 'could not create URI file';
+            } else {
+                $this->server = socket_export_stream($socket);
+                $this->listener = $socket;
+                $this->socketPath = $path;
+                return null;
+            }
+        } catch (\Throwable $e) {
+            $error = "could not listen on the UNIX socket: $e";
+        }
+        socket_close($socket);
+        @\unlink($path);
+        return $error;
     }
 
     public function isClosed(): bool

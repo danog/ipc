@@ -41,6 +41,13 @@ function connect(string $uri, ?Cancellation $cancellation = null): ChannelledSoc
         if ($type !== 'fifo') {
             if ($type === 'file') {
                 $uri = \file_get_contents($uri);
+                if (\PHP_OS_FAMILY === 'Windows' && \str_starts_with($uri, 'unix://')) {
+                    $socket = connectUnixWindows(\substr($uri, 7));
+                    return new ChannelledSocket(
+                        new ReadableResourceStream($socket),
+                        new WritableResourceStream($socket)
+                    );
+                }
             } else {
                 $uri = "unix://$uri";
             }
@@ -89,7 +96,7 @@ function connect(string $uri, ?Cancellation $cancellation = null): ChannelledSoc
         \stream_set_blocking($tempSocket, false);
         \stream_set_write_buffer($tempSocket, 0);
 
-        if (!\fwrite($tempSocket, \pack('v', \strlen($prefix)).$prefix)) {
+        if (\in_array(\fwrite($tempSocket, \pack('v', \strlen($prefix)).$prefix), [false, 0], true)) {
             \fclose($tempSocket);
             unset($tempSocket);
             throw new \RuntimeException("Failure sending request to FIFO server");
@@ -123,4 +130,34 @@ function connect(string $uri, ?Cancellation $cancellation = null): ChannelledSoc
     } while (true);
 
     throw new AssertionError("Unreachable!");
+}
+
+/**
+ * Connect to a UNIX socket on Windows, where PHP streams don't support AF_UNIX (see IpcServer::listenUnixWindows).
+ *
+ * @internal
+ *
+ * @return resource
+ */
+function connectUnixWindows(string $path)
+{
+    if (!\extension_loaded('sockets')) {
+        throw new \RuntimeException("The sockets extension is required to connect to the IPC socket $path");
+    }
+    $socket = socket_create(\AF_UNIX, \SOCK_STREAM, 0);
+    if (!$socket) {
+        throw new \RuntimeException("Could not create IPC socket: ".socket_strerror(socket_last_error()));
+    }
+    try {
+        $connected = socket_connect($socket, $path);
+    } catch (\Throwable $e) {
+        socket_close($socket);
+        throw new \RuntimeException("Could not connect to IPC socket $path", 0, $e);
+    }
+    if (!$connected) {
+        $error = socket_strerror(socket_last_error($socket));
+        socket_close($socket);
+        throw new \RuntimeException("Could not connect to IPC socket $path: $error");
+    }
+    return socket_export_stream($socket);
 }

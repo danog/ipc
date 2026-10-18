@@ -46,6 +46,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
+          extensions: sockets
 
       - name: Run tests
         run: composer update && vendor/bin/phpunit ${{ matrix.phpunit-flags }} --debug
