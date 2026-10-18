@@ -144,20 +144,59 @@ function connectUnixWindows(string $path)
     if (!\extension_loaded('sockets')) {
         throw new \RuntimeException("The sockets extension is required to connect to the IPC socket $path");
     }
-    $socket = socket_create(\AF_UNIX, \SOCK_STREAM, 0);
+    $socket = \socket_create(\AF_UNIX, \SOCK_STREAM, 0);
     if (!$socket) {
-        throw new \RuntimeException("Could not create IPC socket: ".socket_strerror(socket_last_error()));
+        throw new \RuntimeException("Could not create IPC socket: ".\socket_strerror(\socket_last_error()));
     }
     try {
-        $connected = socket_connect($socket, $path);
+        $connected = \socket_connect($socket, $path);
     } catch (\Throwable $e) {
-        socket_close($socket);
+        \socket_close($socket);
         throw new \RuntimeException("Could not connect to IPC socket $path", 0, $e);
     }
     if (!$connected) {
-        $error = socket_strerror(socket_last_error($socket));
-        socket_close($socket);
+        $error = \socket_strerror(\socket_last_error($socket));
+        \socket_close($socket);
         throw new \RuntimeException("Could not connect to IPC socket $path: $error");
     }
-    return socket_export_stream($socket);
+    return exportSocket($socket);
+}
+
+/**
+ * Export a UNIX socket of ext-sockets to a stream.
+ *
+ * On Windows, socket_export_stream() warns that there's no unix:// transport before falling back to a generic socket
+ * stream, which works: silence the warning, which error handlers (that may ignore @) would turn into an exception.
+ *
+ * @internal
+ *
+ * @return resource
+ */
+function exportSocket(\Socket $socket)
+{
+    \set_error_handler(static fn (): bool => true);
+    try {
+        $stream = \socket_export_stream($socket);
+    } finally {
+        \restore_error_handler();
+    }
+    if ($stream === false) {
+        throw new \RuntimeException("Could not export the IPC socket to a stream");
+    }
+    return $stream;
+}
+
+/**
+ * Accept a connection on a non-blocking ext-sockets listener, without the warning of a spurious wakeup.
+ *
+ * @internal
+ */
+function acceptSocket(\Socket $listener): ?\Socket
+{
+    \set_error_handler(static fn (): bool => true);
+    try {
+        return \socket_accept($listener) ?: null;
+    } finally {
+        \restore_error_handler();
+    }
 }

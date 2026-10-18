@@ -144,11 +144,11 @@ class IpcServer
         $listener = $this->listener;
         $this->watcher = EventLoop::onReadable($this->server, static function (string $watcher, $server) use (&$acceptor, $type, $listener): void {
             if ($listener !== null) {
-                // The listener is non-blocking: a spurious wakeup returns false
-                if (!$client = @socket_accept($listener)) {
+                // The listener is non-blocking: a spurious wakeup returns null
+                if (!$client = acceptSocket($listener)) {
                     return;
                 }
-                $client = socket_export_stream($client);
+                $client = exportSocket($client);
                 $channel = new ChannelledSocket(
                     new ReadableResourceStream($client),
                     new WritableResourceStream($client)
@@ -279,23 +279,23 @@ class IpcServer
         }
         @\unlink($path);
         try {
-            $socket = socket_create(\AF_UNIX, \SOCK_STREAM, 0);
+            $socket = \socket_create(\AF_UNIX, \SOCK_STREAM, 0);
         } catch (\Throwable $e) {
             return "could not create the UNIX socket: $e";
         }
         if (!$socket) {
-            return 'could not create the UNIX socket: '.socket_strerror(socket_last_error());
+            return 'could not create the UNIX socket: '.\socket_strerror(\socket_last_error());
         }
         try {
-            if (!socket_bind($socket, $path)
-                || !socket_listen($socket)
-                || !socket_set_nonblock($socket)
+            if (!\socket_bind($socket, $path)
+                || !\socket_listen($socket)
+                || !\socket_set_nonblock($socket)
             ) {
-                $error = 'could not listen on the UNIX socket: '.socket_strerror(socket_last_error($socket));
+                $error = 'could not listen on the UNIX socket: '.\socket_strerror(\socket_last_error($socket));
             } elseif (\file_put_contents($this->uri, 'unix://'.$path) === false) {
                 $error = 'could not create URI file';
             } else {
-                $this->server = socket_export_stream($socket);
+                $this->server = exportSocket($socket);
                 $this->listener = $socket;
                 $this->socketPath = $path;
                 return null;
@@ -303,7 +303,7 @@ class IpcServer
         } catch (\Throwable $e) {
             $error = "could not listen on the UNIX socket: $e";
         }
-        socket_close($socket);
+        \socket_close($socket);
         @\unlink($path);
         return $error;
     }
