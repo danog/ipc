@@ -7,6 +7,7 @@ on:
 jobs:
   tests:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - operating-system: 'ubuntu-latest'
@@ -53,6 +54,8 @@ jobs:
 
       - name: Run psalm
         run: vendor/bin/psalm.phar
+        # psalm/phar 5 doesn't run on PHP 8.4
+        if: matrix.php-version != '8.4'
 
       - name: Run style fixer
         env:
