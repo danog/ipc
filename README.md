@@ -11,6 +11,17 @@
 composer require danog/ipc
 ```
 
+## Transports
+
+`IpcServer` picks the first transport that works (or the ones selected with the `TYPE_*` flags):
+
+* UNIX sockets: on Windows (10 1803+) these require `ext-sockets`, since PHP streams don't support `AF_UNIX` there;
+* FIFOs (Linux only);
+* TCP on `127.0.0.1`, as a last resort: any local user can connect to it.
+
+`connect()` takes the same URI as the server, whatever the transport: on Windows, and with TCP, the URI is a file
+holding the endpoint.
+
 ## Example
 
 Server:
