@@ -45,7 +45,7 @@ class IpcServer
             $uri = \sys_get_temp_dir()."/amp-ipc-".$suffix.".sock";
         }
         if (\file_exists($uri)) {
-            @\unlink($uri);
+            silenced(static fn () => \unlink($uri));
         }
         $this->uri = $uri;
 
@@ -166,7 +166,7 @@ class IpcServer
                     $prefix.'1',
                     $prefix.'2',
                 ] as $k => $socket) {
-                    if (@\filetype($socket) !== 'fifo') {
+                    if (silenced(static fn () => \filetype($socket)) !== 'fifo') {
                         if ($k) {
                             \fclose($sockets[0]);
                         }
@@ -252,9 +252,11 @@ class IpcServer
             $this->server = null;
             \fclose($server);
             $this->listener = null;
-            @\unlink($this->uri);
+            $uri = $this->uri;
+            silenced(static fn () => \unlink($uri));
             if ($this->socketPath !== null) {
-                @\unlink($this->socketPath);
+                $socketPath = $this->socketPath;
+                silenced(static fn () => \unlink($socketPath));
             }
         }
     }
@@ -277,7 +279,7 @@ class IpcServer
         if (\strlen($path) > 107) { // sun_path is 108 bytes long
             $path = \sys_get_temp_dir().\DIRECTORY_SEPARATOR.'amp-ipc-'.\bin2hex(\random_bytes(10)).'.sock';
         }
-        @\unlink($path);
+        silenced(static fn () => \unlink($path));
         try {
             $socket = \socket_create(\AF_UNIX, \SOCK_STREAM, 0);
         } catch (\Throwable $e) {
@@ -304,7 +306,7 @@ class IpcServer
             $error = "could not listen on the UNIX socket: $e";
         }
         \socket_close($socket);
-        @\unlink($path);
+        silenced(static fn () => \unlink($path));
         return $error;
     }
 

@@ -85,6 +85,35 @@ class IpcTest extends AsyncTestCase
         $this->assertFileDoesNotExist($server->getUri());
     }
 
+    /**
+     * Since PHP 8, @ doesn't set error_reporting() to 0: error handlers that only check for that ignore it.
+     *
+     * @dataProvider provideUriType
+     */
+    public function testErrorHandlerIgnoringSilence(string $uri, int $type)
+    {
+        \set_error_handler(static function (int $errno, string $errstr): bool {
+            if (\error_reporting() === 0) {
+                return false;
+            }
+            throw new \ErrorException($errstr, 0, $errno);
+        });
+        try {
+            $server = new IpcServer($uri, $type);
+            $accepted = async($server->accept(...));
+            $client = connect($server->getUri());
+            $socket = $accepted->await();
+
+            $client->send('ping');
+            $this->assertEquals('ping', $socket->receive());
+
+            $client->disconnect();
+            $server->close();
+        } finally {
+            \restore_error_handler();
+        }
+    }
+
     public function provideUriType(): \Generator
     {
         foreach (['', \sys_get_temp_dir().'/pony', \sys_get_temp_dir().'/'.\str_repeat('a', 200)] as $uri) {
