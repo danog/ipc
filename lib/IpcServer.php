@@ -45,7 +45,10 @@ class IpcServer
             $uri = \sys_get_temp_dir()."/amp-ipc-".$suffix.".sock";
         }
         if (\file_exists($uri)) {
-            silenced(static fn () => \unlink($uri));
+            try {
+                @\unlink($uri);
+            } catch (\Throwable) {
+            }
         }
         $this->uri = $uri;
 
@@ -166,7 +169,12 @@ class IpcServer
                     $prefix.'1',
                     $prefix.'2',
                 ] as $k => $socket) {
-                    if (silenced(static fn () => \filetype($socket)) !== 'fifo') {
+                    try {
+                        $type = @\filetype($socket);
+                    } catch (\Throwable) {
+                        $type = false;
+                    }
+                    if ($type !== 'fifo') {
                         if ($k) {
                             \fclose($sockets[0]);
                         }
@@ -187,8 +195,13 @@ class IpcServer
                 );
                 async($channel->send(...), new ChannelInitAck);
             } else {
-                // Error reporting suppressed since stream_socket_accept() emits E_WARNING on client accept failure.
-                if (!$client = @\stream_socket_accept($server, 0)) {  // Timeout of 0 to be non-blocking.
+                // stream_socket_accept() emits E_WARNING on client accept failure, which error handlers may throw, @ or not.
+                try {
+                    $client = @\stream_socket_accept($server, 0); // Timeout of 0 to be non-blocking.
+                } catch (\Throwable) {
+                    $client = false;
+                }
+                if (!$client) {
                     return; // Accepting client failed.
                 }
                 $channel = new ChannelledSocket(
@@ -252,11 +265,15 @@ class IpcServer
             $this->server = null;
             \fclose($server);
             $this->listener = null;
-            $uri = $this->uri;
-            silenced(static fn () => \unlink($uri));
+            try {
+                @\unlink($this->uri);
+            } catch (\Throwable) {
+            }
             if ($this->socketPath !== null) {
-                $socketPath = $this->socketPath;
-                silenced(static fn () => \unlink($socketPath));
+                try {
+                    @\unlink($this->socketPath);
+                } catch (\Throwable) {
+                }
             }
         }
     }
@@ -279,7 +296,10 @@ class IpcServer
         if (\strlen($path) > 107) { // sun_path is 108 bytes long
             $path = \sys_get_temp_dir().\DIRECTORY_SEPARATOR.'amp-ipc-'.\bin2hex(\random_bytes(10)).'.sock';
         }
-        silenced(static fn () => \unlink($path));
+        try {
+            @\unlink($path);
+        } catch (\Throwable) {
+        }
         try {
             $socket = \socket_create(\AF_UNIX, \SOCK_STREAM, 0);
         } catch (\Throwable $e) {
@@ -306,7 +326,10 @@ class IpcServer
             $error = "could not listen on the UNIX socket: $e";
         }
         \socket_close($socket);
-        silenced(static fn () => \unlink($path));
+        try {
+            @\unlink($path);
+        } catch (\Throwable) {
+        }
         return $error;
     }
 

@@ -82,7 +82,10 @@ function connect(string $uri, ?Cancellation $cancellation = null): ChannelledSoc
             }
 
             \register_shutdown_function(static function () use ($socket): void {
-                silenced(static fn () => \unlink($socket));
+                try {
+                    @\unlink($socket);
+                } catch (\Throwable) {
+                }
             });
 
             if (!$sockets[$k] = \fopen($socket, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
@@ -163,34 +166,10 @@ function connectUnixWindows(string $path)
 }
 
 /**
- * Call a function, silencing its warnings.
- *
- * Use this instead of @: since PHP 8, @ doesn't set error_reporting() to 0, so error handlers that only check for
- * that ignore it, and turn the warning of an expected (and handled) failure into an exception.
- *
- * @internal
- *
- * @template T
- *
- * @param callable(): T $fn
- *
- * @return T
- */
-function silenced(callable $fn): mixed
-{
-    \set_error_handler(static fn (): bool => true);
-    try {
-        return $fn();
-    } finally {
-        \restore_error_handler();
-    }
-}
-
-/**
  * Export a UNIX socket of ext-sockets to a stream.
  *
  * On Windows, socket_export_stream() warns that there's no unix:// transport before falling back to a generic socket
- * stream, which works: silence the warning.
+ * stream, which works: silence the warning, which error handlers (that may ignore @) would turn into an exception.
  *
  * @internal
  *
@@ -198,7 +177,12 @@ function silenced(callable $fn): mixed
  */
 function exportSocket(\Socket $socket)
 {
-    $stream = silenced(static fn () => \socket_export_stream($socket));
+    \set_error_handler(static fn (): bool => true);
+    try {
+        $stream = \socket_export_stream($socket);
+    } finally {
+        \restore_error_handler();
+    }
     if ($stream === false) {
         throw new \RuntimeException("Could not export the IPC socket to a stream");
     }
@@ -212,5 +196,10 @@ function exportSocket(\Socket $socket)
  */
 function acceptSocket(\Socket $listener): ?\Socket
 {
-    return silenced(static fn () => \socket_accept($listener)) ?: null;
+    \set_error_handler(static fn (): bool => true);
+    try {
+        return \socket_accept($listener) ?: null;
+    } finally {
+        \restore_error_handler();
+    }
 }
