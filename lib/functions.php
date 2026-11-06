@@ -82,7 +82,10 @@ function connect(string $uri, ?Cancellation $cancellation = null): ChannelledSoc
             }
 
             \register_shutdown_function(static function () use ($socket): void {
-                @\unlink($socket);
+                try {
+                    @\unlink($socket);
+                } catch (\Throwable) {
+                }
             });
 
             if (!$sockets[$k] = \fopen($socket, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
