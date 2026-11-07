@@ -25,7 +25,7 @@
         }
     ],
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.2",
         "amphp/byte-stream": "^2.1.2",
         "amphp/parser": "^1.1.1",
         "amphp/parallel": "^2.3.1"
@@ -38,7 +38,7 @@
         "phpunit/phpunit": "^9.6.22",
         "amphp/phpunit-util": "v3.x-dev",
         "amphp/php-cs-fixer-config": "v2.x-dev",
-        "psalm/phar": "^5.26.1"
+        "psalm/phar": "^7"
     },
     "autoload": {
         "psr-4": {

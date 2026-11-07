@@ -2,6 +2,9 @@
 
 namespace Amp\Ipc\Sync;
 
+/**
+ * @api
+ */
 final class PanicError extends \Error
 {
     /** @var string Class name of uncaught exception. */

@@ -2,6 +2,9 @@
 
 namespace Amp\Ipc\Sync;
 
+/**
+ * @api
+ */
 class ChannelException extends \Exception
 {
 }

@@ -41,6 +41,9 @@ function connect(string $uri, ?Cancellation $cancellation = null): ChannelledSoc
         if ($type !== 'fifo') {
             if ($type === 'file') {
                 $uri = \file_get_contents($uri);
+                if ($uri === false) {
+                    throw new \RuntimeException("Could not read the URI file of the endpoint!");
+                }
                 if (\PHP_OS_FAMILY === 'Windows' && \str_starts_with($uri, 'unix://')) {
                     $socket = connectUnixWindows(\substr($uri, 7));
                     return new ChannelledSocket(
@@ -88,9 +91,11 @@ function connect(string $uri, ?Cancellation $cancellation = null): ChannelledSoc
                 }
             });
 
-            if (!$sockets[$k] = \fopen($socket, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader
+            $fifo = \fopen($socket, 'r+'); // Open in r+w mode to prevent blocking if there is no reader
+            if (!$fifo) {
                 throw new \RuntimeException("Could not open FIFO client socket");
             }
+            $sockets[$k] = $fifo;
         }
 
         if (!$tempSocket = \fopen($uri, 'r+')) { // Open in r+w mode to prevent blocking if there is no reader

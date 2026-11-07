@@ -11,6 +11,8 @@ use SplQueue;
  * An asynchronous channel for sending data between threads and processes.
  *
  * Supports full duplex read and write.
+ *
+ * @api
  */
 final class ChannelledSocket implements Channel
 {
@@ -33,6 +35,7 @@ final class ChannelledSocket implements Channel
     /**
      * {@inheritdoc}
      */
+    #[\Override]
     public function send(mixed $data): void
     {
         if ($this->closed) {
@@ -48,6 +51,7 @@ final class ChannelledSocket implements Channel
     /**
      * {@inheritdoc}
      */
+    #[\Override]
     public function receive(): mixed
     {
         while ($this->received->isEmpty()) {

@@ -49,7 +49,7 @@ final class ChannelParser extends Parser
             $header = yield self::HEADER_LENGTH;
             $data = \unpack("Cprefix/Llength", $header);
 
-            if ($data["prefix"] !== 0) {
+            if ($data === false || $data["prefix"] !== 0) {
                 $data = $header . yield;
                 throw new ChannelException("Invalid packet received: " . self::encodeUnprintableChars($data));
             }
@@ -80,6 +80,6 @@ final class ChannelParser extends Parser
     {
         return \preg_replace_callback("/[^\x20-\x7e]/", function (array $matches) {
             return "\\x" . \dechex(\ord($matches[0]));
-        }, $data);
+        }, $data) ?? \bin2hex($data);
     }
 }
