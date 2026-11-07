@@ -3,6 +3,7 @@
 namespace Amp\Ipc\Sync;
 
 use Amp\ByteStream\ReadableStream;
+use Amp\ByteStream\ResourceStream;
 use Amp\ByteStream\StreamException;
 use Amp\ByteStream\WritableStream;
 use SplQueue;
@@ -78,6 +79,29 @@ final class ChannelledSocket implements Channel
             return null;
         }
         return $received;
+    }
+
+    /**
+     * Keep the event loop running while a receive() waits for data (the default).
+     */
+    public function reference(): void
+    {
+        if ($this->read instanceof ResourceStream) {
+            $this->read->reference();
+        }
+    }
+
+    /**
+     * Don't keep the event loop running while a receive() waits for data.
+     *
+     * A receive() can't be cancelled: a caller that stopped waiting for it (a timeout) leaves a read pending, which
+     * would keep the event loop running until the other end sends something or disconnects.
+     */
+    public function unreference(): void
+    {
+        if ($this->read instanceof ResourceStream) {
+            $this->read->unreference();
+        }
     }
 
     /**

@@ -7,8 +7,12 @@ use Amp\Ipc\Sync\ChannelledSocket;
 use Amp\PHPUnit\AsyncTestCase;
 use Amp\Process\Process;
 
+use Amp\TimeoutCancellation;
+
 use function Amp\async;
+use function Amp\ByteStream\buffer;
 use function Amp\ByteStream\splitLines;
+use function Amp\delay;
 use function Amp\Ipc\connect;
 
 class IpcTest extends AsyncTestCase
@@ -59,6 +63,26 @@ class IpcTest extends AsyncTestCase
         $client->disconnect();
 
         $this->assertEquals(0, $process->join());
+    }
+
+    /**
+     * A pending receive() of an unreferenced socket doesn't keep the event loop running.
+     *
+     * @dataProvider provideUriType
+     */
+    public function testUnreferencedPendingReceive(string $uri, int $type)
+    {
+        $process = Process::start([PHP_BINARY, __DIR__.'/Fixtures/pendingReceive.php', $type, 'unreference']);
+        $this->assertSame('started', buffer($process->getStdout(), new TimeoutCancellation(5)));
+        $this->assertSame(0, $process->join(new TimeoutCancellation(5)));
+
+        // Referenced (the default), the same script waits for the read.
+        $process = Process::start([PHP_BINARY, __DIR__.'/Fixtures/pendingReceive.php', $type, 'reference']);
+        $this->assertSame('started', $process->getStdout()->read(new TimeoutCancellation(5)));
+        delay(1);
+        $this->assertTrue($process->isRunning());
+        $process->kill();
+        $process->join();
     }
 
     public function testWindowsPrefersUnixSockets()
