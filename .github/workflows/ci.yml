@@ -11,9 +11,6 @@ jobs:
       matrix:
         include:
           - operating-system: 'ubuntu-latest'
-            php-version: '8.1'
-
-          - operating-system: 'ubuntu-latest'
             php-version: '8.2'
 
           - operating-system: 'ubuntu-latest'
@@ -23,11 +20,11 @@ jobs:
             php-version: '8.4'
 
           - operating-system: 'windows-latest'
-            php-version: '8.1'
+            php-version: '8.2'
             job-description: 'on Windows'
 
           - operating-system: 'macos-latest'
-            php-version: '8.1'
+            php-version: '8.2'
             job-description: 'on macOS'
 
     name: PHP ${{ matrix.php-version }} ${{ matrix.job-description }}
@@ -54,8 +51,6 @@ jobs:
 
       - name: Run psalm
         run: vendor/bin/psalm.phar
-        # psalm/phar 5 doesn't run on PHP 8.4
-        if: matrix.php-version != '8.4'
 
       - name: Run style fixer
         env:

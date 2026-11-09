@@ -4,6 +4,8 @@ namespace Amp\Ipc;
 
 /**
  * Thrown in case a second read operation is attempted while another read operation is still pending.
+ *
+ * @api
  */
 final class PendingAcceptError extends \Error
 {

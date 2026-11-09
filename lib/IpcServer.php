@@ -12,6 +12,9 @@ use Revolt\EventLoop;
 
 use function Amp\async;
 
+/**
+ * @api
+ */
 class IpcServer
 {
     public const TYPE_AUTO = 0;
@@ -28,7 +31,11 @@ class IpcServer
 
     private string $uri;
 
-    /** UNIX socket listening with ext-sockets (Windows), accepted with socket_accept */
+    /**
+     * UNIX socket listening with ext-sockets (Windows), accepted with socket_accept.
+     *
+     * @psalm-suppress UnusedProperty Read once listening, by the watcher (a copy, see the constructor)
+     */
     private ?\Socket $listener = null;
 
     /** Path of the UNIX socket a Windows URI file points to */
@@ -93,7 +100,7 @@ class IpcServer
                 $error = '';
                 try {
                     // Open in r+w mode to prevent blocking if there is no reader
-                    $this->server = \fopen($uri, 'r+');
+                    $this->server = \fopen($uri, 'r+') ?: null;
                 } catch (\Throwable $e) {
                     $error = "$e";
                 }
@@ -107,7 +114,7 @@ class IpcServer
                 $errno = -1;
                 $errstr = 'no error';
                 try {
-                    $this->server = \stream_socket_server($listenUri, $errno, $errstr, \STREAM_SERVER_BIND | \STREAM_SERVER_LISTEN);
+                    $this->server = \stream_socket_server($listenUri, $errno, $errstr, \STREAM_SERVER_BIND | \STREAM_SERVER_LISTEN) ?: null;
                 } catch (\Throwable $e) {
                     $errstr = "exception: $e";
                 }
@@ -115,6 +122,9 @@ class IpcServer
                     if ($type === self::TYPE_TCP) {
                         try {
                             $name = \stream_socket_get_name($this->server, false);
+                            if ($name === false) {
+                                throw new AssertionError('No address');
+                            }
                             $pos = \strrpos($name, ":");
                             if ($pos === false) {
                                 throw new AssertionError('No port');
@@ -157,12 +167,16 @@ class IpcServer
                     new WritableResourceStream($client)
                 );
             } elseif ($type === self::TYPE_FIFO) {
-                $length = \unpack('v', \fread($server, 2))[1];
-                if (!$length) {
+                $length = \fread($server, 2);
+                $length = $length !== false && \strlen($length) === 2 ? \unpack('v', $length) : false;
+                if ($length === false || !$length[1]) {
                     return; // Could not accept, wrong length read
                 }
 
-                $prefix = \fread($server, $length);
+                $prefix = \fread($server, $length[1]);
+                if ($prefix === false || $prefix === '') {
+                    return; // Could not accept, no prefix read
+                }
                 $sockets = [];
 
                 foreach ([
@@ -182,12 +196,14 @@ class IpcServer
                     }
 
                     // Open in either read or write mode to send a close signal when done
-                    if (!$sockets[$k] = \fopen($socket, $k ? 'w' : 'r')) {
+                    $fifo = \fopen($socket, $k ? 'w' : 'r');
+                    if (!$fifo) {
                         if ($k) {
                             \fclose($sockets[0]);
                         }
                         return; // Could not open fifo
                     }
+                    $sockets[$k] = $fifo;
                 }
                 $channel = new ChannelledSocket(
                     new ReadableResourceStream($sockets[0]),
